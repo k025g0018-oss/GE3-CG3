@@ -1,4 +1,5 @@
 #include "DirectInput.h"
+#include "Window.h"
 
 #include <cassert>
 #include <cstring>

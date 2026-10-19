@@ -2,8 +2,10 @@
 
 #include <cassert>
 
+#ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+#endif // USE_IMGUI
 
 /// <summary>
 /// ウィンドウプロシージャ
@@ -15,7 +17,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 /// <returns></returns>
 LRESULT CALLBACK Window::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	// ImGui
-#if USE_IMGUI
+#ifdef USE_IMGUI
 	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
 		return true;
 	}

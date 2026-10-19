@@ -2,7 +2,6 @@
 
 #include "Window.h"
 
-#include <Windows.h>
 #include <wrl.h>
 #include <cstdint>
 
@@ -11,6 +10,9 @@
 
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
+
+// 前方宣言
+class Window;
 
 ///// ----- DirectInput ----- /////
 
