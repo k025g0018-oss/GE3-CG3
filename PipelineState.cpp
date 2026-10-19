@@ -8,9 +8,15 @@ PipelineState::~PipelineState() {
 	Finalize();
 }
 
-/// --- 初期化 ---
-// 描画に必要なPSOを作成
-void PipelineState::Initialize(ID3D12Device* device, std::ostream& logStream) {
+/// <summary>
+/// 初期化
+/// 描画に必要なPSOを作成
+/// </summary>
+/// <param name="device"></param>
+/// <param name="logStream"></param>
+/// <param name="blendMode"></param>
+void PipelineState::Initialize(ID3D12Device* device, std::ostream& logStream, BlendMode blendMode) {
+
 	/// --- RootSignature ---
 	// RootSignatureを作成
 	rootSignature_.Initialize(device, logStream);
@@ -21,7 +27,7 @@ void PipelineState::Initialize(ID3D12Device* device, std::ostream& logStream) {
 
 	/// --- BlendState ---
 	// 色の書き込み方法を設定
-	blendState_.Initialize();
+	blendState_.Initialize(blendMode);
 
 	/// --- RasterizerState ---
 	// 面の判定と塗りつぶし方法を設定

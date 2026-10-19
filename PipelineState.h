@@ -21,9 +21,14 @@ public:
 	PipelineState(const PipelineState&) = delete;
 	PipelineState& operator=(const PipelineState&) = delete;
 
-	/// --- 初期化 ---
-	// 描画に必要なPSOを作成
-	void Initialize(ID3D12Device* device, std::ostream& logStream);
+	/// <summary>
+	/// 初期化
+	/// 描画に必要なPSOを作成
+	/// </summary>
+	/// <param name="device"></param>
+	/// <param name="logStream"></param>
+	/// <param name="blendMode"></param>
+	void Initialize(ID3D12Device* device, std::ostream& logStream, BlendMode blendMode = BlendMode::kNone);
 
 	/// --- 取得 ---
 	// 作成したRootSignatureを取得

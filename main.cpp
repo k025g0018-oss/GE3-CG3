@@ -1027,6 +1027,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		PipelineState pipelineState;
 		pipelineState.Initialize(device.Get(), logStream);
 
+		// NormalBlend(半透明)で描画するためのPSO
+		PipelineState normalBlendPipelineState;
+		normalBlendPipelineState.Initialize(device.Get(), logStream, BlendMode::kNormal);
+
 		// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
 		ComPtr<ID3D12Resource> wvpResource;
 		// Createが返した所有権をComPtrへ移す
@@ -2531,10 +2535,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					textureManager.GetSrvHandle(
 						static_cast<uint32_t>(planeTextureMode));
 
+				// 半透明にするため、NormalBlendのPSOに切り替える
+				commandList->SetPipelineState(normalBlendPipelineState.GetPipelineState());
+
 				// OBJから読み込んだ平面を描画する
 				planeModel.Draw(
 					commandList,
 					planeTextureHandle);
+
+				// ほかの不透明な物体のために、合成なしのPSOに戻す
+				commandList->SetPipelineState(pipelineState.GetPipelineState());
 			}
 
 			/// --- Axisモデル描画 ---
@@ -2690,6 +2700,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 		pipelineState.Finalize();
+		normalBlendPipelineState.Finalize();
 		commandContext.Finalize();
 
 		/// --- 4_ディスクリプタヒープ ---

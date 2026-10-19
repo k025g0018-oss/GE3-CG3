@@ -61,13 +61,16 @@ PixelShaderOutput main(VertexShaderOutput input)
             lightingCos = pow(NdotL * 0.5f + 0.5f, 2.0f);
         }
         
-        // マテリアル・テクスチャ・光源色・明るさを合成する
-        output.color =
-            gMaterial.color *
-            textureColor *
-            gDirectionalLight.color *
+         // 色(rgb)にはライティングを行う
+        output.color.rgb =
+            gMaterial.color.rgb *
+            textureColor.rgb *
+            gDirectionalLight.color.rgb *
             lightingCos *
             gDirectionalLight.intensity;
+
+        // α値にはライティングを行わない(明るさで透明度が変わらないようにする)
+        output.color.a = gMaterial.color.a * textureColor.a;
     }
     else
     {
