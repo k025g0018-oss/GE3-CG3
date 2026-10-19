@@ -957,9 +957,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ウィンドウを表示する
 		ShowWindow(hwnd, SW_SHOW);
 
+		/// --- 入力 ---
+
 		// DirectInputを初期化する
-		DirectInput directInput;
-		directInput.Initialize(GetModuleHandle(nullptr), hwnd);
+		// 入力のインスタンスを動的に生成して、ポインタを残す
+		DirectInput* input = nullptr;
+		input = new DirectInput();
+		// 入力の初期化
+		input->Initialize(GetModuleHandle(nullptr), hwnd);
 
 		/// --- DebugLayer ---
 
@@ -2005,20 +2010,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				///// ----- キーボードの処理 ----- /////
 
 				// 毎フレーム、キーボード状態を更新する
-				directInput.Update();
+				input->Update();
 
 				// 上段の0キーを押している間、毎フレーム「0」を表示する
-				if (directInput.IsPress(DIK_0)) {
+				if (input->IsPress(DIK_0)) {
 					OutputDebugStringA("0\n");
 				}
 
 				// 上段の1キーを押した瞬間だけ「1」を表示する
-				if (directInput.IsTrigger(DIK_1)) {
+				if (input->IsTrigger(DIK_1)) {
 					OutputDebugStringA("1\n");
 				}
 
 				// Spaceキーを押した瞬間に使用するカメラを切り替える
-				if (directInput.IsTrigger(DIK_SPACE)) {
+				if (input->IsTrigger(DIK_SPACE)) {
 					isDebugCameraActive =
 						!isDebugCameraActive;
 				}
@@ -2032,18 +2037,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				Transform& spriteTransform = sprite2D.GetTransform();
 
 				// 左右キーで横に動かす
-				if (directInput.IsPress(DIK_LEFT)) {
+				if (input->IsPress(DIK_LEFT)) {
 					spriteTransform.translate.x -= kSpriteSpeed;
 				}
-				if (directInput.IsPress(DIK_RIGHT)) {
+				if (input->IsPress(DIK_RIGHT)) {
 					spriteTransform.translate.x += kSpriteSpeed;
 				}
 
 				// 上下キーで縦に動かす(画面座標は下がプラスなので、上はマイナス)
-				if (directInput.IsPress(DIK_UP)) {
+				if (input->IsPress(DIK_UP)) {
 					spriteTransform.translate.y -= kSpriteSpeed;
 				}
-				if (directInput.IsPress(DIK_DOWN)) {
+				if (input->IsPress(DIK_DOWN)) {
 					spriteTransform.translate.y += kSpriteSpeed;
 				}
 
@@ -2831,7 +2836,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		audio.Finalize();
 
 		// 入力を開放する (ウィンドウを閉じる前に、キーボードの取得をやめる)
-		directInput.Finalize();
+		input->Finalize();
+		// 動的に生成したインスタンスを削除する
+		delete input;
+		input = nullptr;
 
 		CloseWindow(hwnd);
 
