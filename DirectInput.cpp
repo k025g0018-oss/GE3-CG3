@@ -11,10 +11,14 @@ DirectInput::~DirectInput() {
 /// <summary>
 /// 初期化処理
 /// </summary>
-void DirectInput::Initialize(HINSTANCE hInstance, HWND hwnd) {
+void DirectInput::Initialize(Window* window) {
+
+	// 借りてきたWindowのインスタンスを記録
+	this->window_ = window;
+
 	// DirectInput本体をメンバ変数へ生成する
 	HRESULT hr = DirectInput8Create(
-		hInstance,
+		window_->GetHInstance(),
 		DIRECTINPUT_VERSION,
 		IID_IDirectInput8,
 		reinterpret_cast<void**>(directInput_.GetAddressOf()),
@@ -36,7 +40,7 @@ void DirectInput::Initialize(HINSTANCE hInstance, HWND hwnd) {
 	assert(SUCCEEDED(hr));
 
 	// 排他制御レベルのセット
-	hr = keyboard_->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+	hr = keyboard_->SetCooperativeLevel(window_->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
 	assert(SUCCEEDED(hr));
 }
 

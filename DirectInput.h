@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Window.h"
+
 #include <Windows.h>
 #include <wrl.h>
 #include <cstdint>
@@ -20,8 +22,8 @@ public:
 	/// <summary>
 	/// 初期化処理
 	/// </summary>
-	// DirectInputの生成に必要なインスタンスとウィンドウを受け取る
-	void Initialize(HINSTANCE hInstance, HWND hwnd);
+	// 入力の生成に使うWindowを受け取る
+	void Initialize(Window* window);
 
 	/// <summary>
 	/// 更新処理
@@ -50,6 +52,16 @@ public:
 	bool IsTrigger(uint8_t keyNumber) const;
 
 private:
+	///// ----- 関数 ----- /////
+
+
+	///// ----- ===== ----- /////
+
+	///// ----- メンバ変数 ----- /////
+
+	// WindowsAPI
+	Window* window_ = nullptr;
+
 	// DirectInput本体を自動解放する
 	Microsoft::WRL::ComPtr<IDirectInput8> directInput_;
 
@@ -61,4 +73,6 @@ private:
 
 	// 1フレーム前のキー入力状態
 	BYTE previousKeys_[256]{};
+
+	///// ----- ===== ----- /////
 };

@@ -791,6 +791,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 最初に生成し、ほかのローカル変数より最後にデストラクタを呼ぶ
 		D3DResourceLeakChecker leakChecker;
 
+		///// ----- ウィンドウ ----- /////
+
+		// ポインタ
+		Window* window = nullptr;
+
+		// WindowsAPIの初期化
+		window = new Window();
+		window->Initialize();
+
+		/// --- 入力 ---
+
+		// DirectInputを初期化する
+		// 入力のインスタンスを動的に生成して、ポインタを残す
+		DirectInput* input = nullptr;
+		input = new DirectInput();
+		// 入力の初期化
+		input->Initialize(window);
+
+		/// --- Audio ---
+
 		// XAudio2を初期化して音声を再生できるようにする
 		Audio audio;
 		audio.Initialize();
@@ -826,24 +846,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 出力ウィンドウへの文字出力
 		OutputDebugStringA("Hello,DirectX!\n");
-
-		///// ----- ウィンドウ ----- /////
-
-		// ポインタ
-		Window* window = nullptr;
-
-		// WindowsAPIの初期化
-		window = new Window();
-		window->Initialize();
-
-		/// --- 入力 ---
-
-		// DirectInputを初期化する
-		// 入力のインスタンスを動的に生成して、ポインタを残す
-		DirectInput* input = nullptr;
-		input = new DirectInput();
-		// 入力の初期化
-		input->Initialize(window->GetHInstance(), window->GetHwnd());
 
 		/// --- DebugLayer ---
 
