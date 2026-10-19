@@ -144,14 +144,6 @@ void Window::Initialize() {
 }
 
 /// <summary>
-/// 更新
-/// </summary>
-void Window::Update() {
-
-
-}
-
-/// <summary>
 /// 終了
 /// </summary>
 void Window::Finalize() {
@@ -162,4 +154,30 @@ void Window::Finalize() {
 	UnregisterClass(wc_.lpszClassName, wc_.hInstance);
 	// COMの終了処理
 	CoUninitialize();
+}
+
+/// <summary>
+/// メッセージの処理
+/// </summary>
+/// <returns></returns>
+bool Window::ProcessMessage() {
+
+	/// --- 文字列 ---
+	// メッセージ構造体 Windowsから送られてくる
+	MSG msg{};
+
+	// メッセージが来ていたら取り出して処理する
+	if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+		// キー入力のメッセージを文字のメッセージに変換する
+		TranslateMessage(&msg);
+		// ウィンドウプロシージャにメッセージを送る
+		DispatchMessage(&msg);
+	}
+
+	// 終了のメッセージが来たら、ゲームループを抜けるように伝える
+	if (msg.message == WM_QUIT) {
+		return true;
+	}
+
+	return false;
 }

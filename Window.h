@@ -23,14 +23,15 @@ public:
 	void Initialize();
 
 	/// <summary>
-	/// 更新
-	/// </summary>
-	void Update();
-
-	/// <summary>
 	/// 終了
 	/// </summary>
 	void Finalize();
+
+	/// <summary>
+	/// メッセージの処理
+	/// </summary>
+	/// <returns></returns>
+	bool ProcessMessage();
 
 	///// ----- ===== ----- /////
 
@@ -61,7 +62,6 @@ public:
 	}
 
 	///// ----- ===== ----- /////
-
 
 	///// ----- setter ----- /////
 
