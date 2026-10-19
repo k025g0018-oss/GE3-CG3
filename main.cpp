@@ -784,9 +784,8 @@ struct D3DResourceLeakChecker {
 
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
-	// COMの初期化
-	HRESULT hr = CoInitializeEx(0, COINIT_MULTITHREADED);
-	assert(SUCCEEDED(hr));
+	// DirectXの各関数の結果を受け取る
+	HRESULT hr;
 
 	{
 		// 最初に生成し、ほかのローカル変数より最後にデストラクタを呼ぶ
@@ -844,7 +843,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DirectInput* input = nullptr;
 		input = new DirectInput();
 		// 入力の初期化
-		input->Initialize(GetModuleHandle(nullptr), hwnd);
+		input->Initialize(window->GetHInstance(), window->GetHwnd());
 
 		/// --- DebugLayer ---
 
@@ -966,8 +965,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- SwapChainの生成 ---
 		ComPtr<IDXGISwapChain4> swapChain;
 		DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-		swapChainDesc.Width = kClientWidth;							 // 画面の幅。ウィンドウのクライアント領域を同じものにしておく。
-		swapChainDesc.Height = kClientHeight;						 // 画面の高さ。ウィンドウのクライアント領域を同じものにしておく。
+		swapChainDesc.Width = Window::kClientWidth;							 // 画面の幅。ウィンドウのクライアント領域を同じものにしておく。
+		swapChainDesc.Height = Window::kClientHeight;						 // 画面の高さ。ウィンドウのクライアント領域を同じものにしておく。
 		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;			 // 色の形式
 		swapChainDesc.SampleDesc.Count = 1;							 // マルチサンプルしない
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; // 描画のターゲットとして利用する
@@ -976,7 +975,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// コマンドキュー、ウィンドウハンドル、設定を渡して生成する。
 		hr = dxgiFactory->CreateSwapChainForHwnd(
 			commandContext.GetCommandQueue(),
-			hwnd,
+			window->GetHwnd(),
 			&swapChainDesc,
 			nullptr,
 			nullptr,
@@ -1055,7 +1054,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- Sprite専用のVertexBuffer、Material、WVPを作成 ---
 		// 2D専用オブジェクトであることが分かる名前に統一する
 		Sprite2D sprite2D;
-		sprite2D.Initialize(device.Get(), kClientWidth, kClientHeight, 640.0f, 360.0f);
+		sprite2D.Initialize(device.Get(), Window::kClientWidth, Window::kClientHeight, 640.0f, 360.0f);
 
 		// 三角形とは別にSpriteのTextureを選択する
 		int spriteTextureMode = 1;
@@ -1163,7 +1162,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 初期化 ---
 		// 深度ステンシルテクスチャリソースとDSVを作る
 		DepthStencilView depthStencilView;
-		depthStencilView.Initialize(device.Get(), dsvDescriptorHeap, kClientWidth, kClientHeight);
+		depthStencilView.Initialize(device.Get(), dsvDescriptorHeap, Window::kClientWidth, Window::kClientHeight);
 
 		/// --- Texture転送コマンドの実行 ---
 		// コマンドを実行してGPUの完了を待つ
@@ -1177,8 +1176,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ビューポート
 		D3D12_VIEWPORT viewport{};
 		// クライアント領域のサイズと一緒にして画面全体に表示
-		viewport.Width = kClientWidth;
-		viewport.Height = kClientHeight;
+		viewport.Width = Window::kClientWidth;
+		viewport.Height = Window::kClientHeight;
 		viewport.TopLeftX = 0;
 		viewport.TopLeftY = 0;
 		viewport.MinDepth = 0.0f;
@@ -1188,13 +1187,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		D3D12_RECT scissorRect{};
 		// ビューポートと同じ矩形が構成されるようにする
 		scissorRect.left = 0;
-		scissorRect.right = kClientWidth;
+		scissorRect.right = Window::kClientWidth;
 		scissorRect.top = 0;
-		scissorRect.bottom = kClientHeight;
+		scissorRect.bottom = Window::kClientHeight;
 
 		// ImGuiを描画するSwapChain側は、実際のウィンドウサイズへ追従させる
-		uint32_t backBufferWidth = kClientWidth;
-		uint32_t backBufferHeight = kClientHeight;
+		uint32_t backBufferWidth = Window::kClientWidth;
+		uint32_t backBufferHeight = Window::kClientHeight;
 		D3D12_VIEWPORT editorViewport = viewport;
 		D3D12_RECT editorScissorRect = scissorRect;
 
@@ -1246,8 +1245,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		Camera camera;
 
 		camera.Initialize(
-			float(kClientWidth) /
-			float(kClientHeight));
+			float(Window::kClientWidth) /
+			float(Window::kClientHeight));
 
 		// Object3D用のWorld行列
 		Matrix4x4 worldMatrix =
@@ -1261,8 +1260,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DebugCamera debugCamera;
 
 		debugCamera.Initialize(
-			float(kClientWidth) /
-			float(kClientHeight));
+			float(Window::kClientWidth) /
+			float(Window::kClientHeight));
 
 		// falseは通常カメラ、trueはデバッグカメラを使用する
 		bool isDebugCameraActive = false;
@@ -1457,8 +1456,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			device.Get(),
 			srvDescriptorHeap,
 			kSceneSrvDescriptorIndex,
-			kClientWidth,
-			kClientHeight,
+			Window::kClientWidth,
+			Window::kClientHeight,
 			rtvDesc.Format);
 
 		IMGUI_CHECKVERSION();
@@ -1470,7 +1469,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 		ImGui::StyleColorsDark();
-		ImGui_ImplWin32_Init(hwnd);
+		ImGui_ImplWin32_Init(window->GetHwnd());
 
 		// Dear ImGuiのDirectX 12初期化情報をまとめる
 		ImGui_ImplDX12_InitInfo initInfo{};
@@ -1608,7 +1607,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			} else {
 				// WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
 				RECT clientRect{};
-				GetClientRect(hwnd, &clientRect);
+				GetClientRect(window->GetHwnd(), &clientRect);
 				const uint32_t clientWidth = static_cast<uint32_t>(clientRect.right - clientRect.left);
 				const uint32_t clientHeight = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
 				if (clientWidth == 0 || clientHeight == 0) {
@@ -2670,9 +2669,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- 解放処理 ----- /////
 
-		// WindowsAPI解放
-		delete window;
-
 		/// --- 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前) ---
 		vertexBuffer.Finalize();
 
@@ -2725,12 +2721,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		delete input;
 		input = nullptr;
 
-		CloseWindow(hwnd);
+		// WindowsAPIの終了処理 (ウィンドウを閉じて、COMを終了する)
+		window->Finalize();
+		// 動的に生成したインスタンスを削除する
+		delete window;
+		window = nullptr;
 
 	} // leakCheckerより後に作られたComPtrを先に解放する
-
-	// COMの終了処理
-	CoUninitialize();
 
 	return 0;
 }

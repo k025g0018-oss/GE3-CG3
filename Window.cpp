@@ -1,8 +1,9 @@
 #include "Window.h"
+
+#include <cassert>
+
 #include "externals/imgui/imgui.h"
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-#include <cstdint>
 
 /// <summary>
 /// ウィンドウプロシージャ
@@ -12,7 +13,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 /// <param name="wparam"></param>
 /// <param name="lparam"></param>
 /// <returns></returns>
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
+LRESULT CALLBACK Window::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	// ImGui
 #if USE_IMGUI
 	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
@@ -89,23 +90,19 @@ void Window::Initialize() {
 
 	// COMの初期化 このプログラムでCOMという仕組みを使う
 	HRESULT hr = CoInitializeEx(0, COINIT_MULTITHREADED);
+	assert(SUCCEEDED(hr));
 
-	WNDCLASS wc{};
 	// ウィンドウプロシージャ
-	wc.lpfnWndProc = WindowProc;
+	wc_.lpfnWndProc = WindowProc;
 	// ウィンドウクラス名(何でもよい)
-	wc.lpszClassName = L"CG2WindowClass";
+	wc_.lpszClassName = L"CG2WindowClass";
 	// インスタンスハンドル
-	wc.hInstance = GetModuleHandle(nullptr);
+	wc_.hInstance = GetModuleHandle(nullptr);
 	// カーソル
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	wc_.hCursor = LoadCursor(nullptr, IDC_ARROW);
 
 	// ウィンドウクラスを登録する
-	RegisterClass(&wc);
-
-	// クライアント領域のサイズ (ゲーム内部の解像度)
-	const int32_t kClientWidth = 1280;
-	const int32_t kClientHeight = 720;
+	RegisterClass(&wc_);
 
 	// ウィンドウサイズを表す構造体にクライアント領域を入れる
 	RECT wrc = {0, 0, kClientWidth, kClientHeight};
@@ -113,8 +110,8 @@ void Window::Initialize() {
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
 	// ウィンドウの生成
-	HWND hwnd = CreateWindow(
-		wc.lpszClassName,	  // 利用するクラス名
+	hwnd_ = CreateWindow(
+		wc_.lpszClassName,	  // 利用するクラス名
 		L"CG2",				  // タイトルバーの文字
 		WS_OVERLAPPEDWINDOW,  // ウィンドウスタイル
 		CW_USEDEFAULT,		  // 表示X座標(Windowsに任せる)
@@ -123,7 +120,7 @@ void Window::Initialize() {
 		wrc.bottom - wrc.top, // ウィンドウ縦幅
 		nullptr,			  // 親ウィンドウハンドル
 		nullptr,			  // メニューハンドル
-		wc.hInstance,		  // インスタンスハンドル
+		wc_.hInstance,		  // インスタンスハンドル
 		nullptr				  // オプション
 	);
 
@@ -138,16 +135,10 @@ void Window::Initialize() {
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
 	// ウィンドウの大きさを変える (位置はそのまま)
-	SetWindowPos(hwnd, nullptr, 0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, SWP_NOMOVE | SWP_NOZORDER);
+	SetWindowPos(hwnd_, nullptr, 0, 0, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top, SWP_NOMOVE | SWP_NOZORDER);
 
 	// ウィンドウを表示する
-	ShowWindow(hwnd, SW_SHOW);
-
-	// クライアント領域をもとに実際のサイズにwrcを変更してもらう
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
-
-	// ウィンドウを表示する
-	ShowWindow(hwnd, SW_SHOW);
+	ShowWindow(hwnd_, SW_SHOW);
 
 	///// ----- ===== ----- /////
 }
@@ -157,4 +148,18 @@ void Window::Initialize() {
 /// </summary>
 void Window::Update() {
 
+
+}
+
+/// <summary>
+/// 終了
+/// </summary>
+void Window::Finalize() {
+
+	// ウィンドウを閉じる
+	CloseWindow(hwnd_);
+	//登録したウィンドウクラスを解除する
+	UnregisterClass(wc_.lpszClassName, wc_.hInstance);
+	// COMの終了処理
+	CoUninitialize();
 }
