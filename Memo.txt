@@ -1,0 +1,234 @@
+﻿///// ----- 自作エンジンの全体構成 ----- /////
+
+このプロジェクトは、WinMainが全体の順番を管理し、DirectX 12の専門処理を各クラスへ任せる構成にする。
+main.cppには「何をどの順番で行うか」を残し、各クラスには「その処理をどう実現するか」をまとめる。
+
+現在の主な担当は次の通り。
+
+・main.cpp
+  アプリケーション全体の初期化、ゲーム更新、ImGui、描画順、終了順を管理する。
+
+・Logger
+  UTF-8文字列とワイド文字列の変換、ログファイルとデバッグ出力への書き込みを行う。
+
+・DxcCompiler
+  DXCを初期化し、VertexShaderとPixelShaderをコンパイルする。
+
+・RootSignature
+  CBV、SRV、SamplerをShaderのどこへ接続するか定義する。
+
+・PipelineState
+  RootSignature、InputLayout、BlendState、RasterizerState、Shader、DepthStencilStateをまとめてPSOを作る。
+
+・InputLayout、BlendState、RasterizerState、DepthStencilState
+  PSOを構成する各設定を個別に管理する。
+
+・ShaderProgram
+  DxcCompilerを使ってVertexShaderとPixelShaderをコンパイルし、ShaderBlobを管理する。
+
+・DescriptorHeap
+  RTV、SRV、DSV用のDescriptorHeapを管理する。
+
+・VertexBuffer
+  VertexResource、Mapした頂点データ、VertexBufferViewを管理する。
+
+・TextureManager、ShaderResourceView
+  Textureの読み込み、GPU転送、TextureResource、SRVを管理する。
+
+・DepthStencilView
+  DepthStencilTextureとDSVを管理する。
+
+・ParticleSystem
+  Production Modeで使用する三角形の生成、移動、回転、壁反射、増殖、描画を管理する。
+  Particleごとに別のWVP領域を持ち、複数の三角形を別々の位置へ描画する。
+
+・Sprite
+  2D用のVertexBuffer、Material、Transform、WVPを管理する。
+  正射影行列を使い、3Dの描画モードとは別にSpriteを描画する。
+
+・CommandContext
+  CommandQueue、CommandAllocator、CommandList、Fenceを所有する。
+  CPUがコマンドを記録し、GPUへ渡し、完了を待って次のフレームへ進む流れを管理する。
+
+・Matrix4x4、Vector
+  座標、拡縮、回転、移動、View、Projectionなどの計算を担当する。
+
+
+///// ----- 初期化の流れ ----- /////
+
+/// --- 1_COMと例外処理 ---
+1_CoInitializeExでCOMを初期化する。
+2_SetUnhandledExceptionFilterでクラッシュダンプ出力を登録する。
+3_logsフォルダとログファイルを作る。
+
+/// --- 2_Window ---
+1_WindowClassを登録する。
+2_CreateWindowでウィンドウを作る。
+3_ShowWindowで表示する。
+
+/// --- 3_DirectX 12 Device ---
+1_DebugLayerを有効にする。
+2_DXGIFactoryを作る。
+3_使用するGPU Adapterを選ぶ。
+4_AdapterからID3D12Deviceを作る。
+5_InfoQueueへエラーと警告の設定を行う。
+
+/// --- 4_CommandContext ---
+1_CommandQueueを作る。
+2_CommandAllocatorを作る。
+3_CommandListを作る。
+4_GPU同期用のFenceとEventを作る。
+
+CommandListには、CPU側で「GPUに実行してほしい命令」を順番に積む。
+CommandQueueは、完成したCommandListをGPUへ渡す。
+Fenceは、GPUの処理完了をCPU側で確認するために使う。
+
+/// --- 5_SwapChainとDescriptorHeap ---
+1_SwapChainを作る。
+2_RTV用、SRV用、DSV用のDescriptorHeapを作る。
+3_SwapChainのBackBufferからRTVを作る。
+
+/// --- 6_PSO(Pipeline State Object) ---
+1_RootSignatureを作る。
+2_InputLayoutで頂点データの並びを設定する。
+3_BlendStateで色の書き込み方法を設定する。
+4_RasterizerStateで面の判定と塗りつぶし方法を設定する。
+5_ShaderProgramからDxcCompilerを使いVertexShaderとPixelShaderをコンパイルする。
+6_DepthStencilStateで奥行き判定を設定する。
+7_全設定をD3D12_GRAPHICS_PIPELINE_STATE_DESCへまとめてPSOを作る。
+
+RootSignatureやShaderなどの設定は、描画中に毎回作らない。
+初期化時にPSOとしてまとめ、描画時は作成済みのPSOをCommandListへ設定する。
+
+/// --- 7_BufferとTexture ---
+1_WVP用ConstantBufferを作る。
+2_Material用ConstantBufferを作る。
+3_VertexBufferを作る。
+4_white、uvChecker、genbanekoを読み込む。
+5_TextureをGPUへ転送するコマンドをCommandListへ積む。
+6_TextureごとのSRVを作る。
+7_DepthStencilTextureとDSVを作る。
+8_CommandContextで転送コマンドを実行する。
+9_ParticleSystemへ移動範囲、最大数、Particle用WVPResourceを設定する。
+10_Sprite用のVertexBuffer、MaterialResource、WVPResourceを作る。
+
+/// --- 8_ImGui ---
+1_ImGui Contextを作る。
+2_WindowとDirectX 12用の初期化を行う。
+3_SRV DescriptorHeapの先頭をImGui用として渡す。
+
+
+///// ----- 1フレームの流れ ----- /////
+
+/// --- 1_Window Message ---
+Window Messageがあれば先に処理する。
+終了メッセージが届いた場合はメインループを終了する。
+
+/// --- 2_ImGui開始 ---
+ImGui_ImplDX12_NewFrame、ImGui_ImplWin32_NewFrame、ImGui::NewFrameの順で開始する。
+
+/// --- 3_Game Update ---
+1_ImGuiで選ばれたDisplayModeを確認する。
+現在のフレームで使うDisplayModeを保存し、頂点更新と描画で同じモードを使う。
+2_三角形、三角錐、演出モードに応じて頂点データを更新する。
+3_TransformからWorld行列を作る。
+4_CameraからView行列を作る。
+5_画角からProjection行列を作る。
+6_World、View、Projectionを掛けてWVPを作る。
+7_WVP用ConstantBufferへ計算結果を書く。
+
+Spriteでは、SRTからWorld行列を作り、単位行列のViewと正射影のProjectionを使ってWVPを更新する。
+
+Production Modeでは、ParticleSystemが次の順番で更新する。
+
+1_各Particleを速度に従って移動する。
+2_角速度に従って三角形を回転する。
+3_範囲外の壁に当たったら座標を範囲内へ戻して反射する。
+4_壁に当たったParticleの数だけ、ランダムなParticleを追加する。
+5_Particle数が最大数に到達したら全て削除して1個から再開する。
+
+新しいParticleは、位置、移動方向、速さ、拡縮、向き、角速度をランダムに決める。
+
+/// --- 4_ImGui更新 ---
+色、TextureMode、DisplayMode、Scale、Rotation、Positionなどの操作項目を作る。
+Spriteは三角形とは別のTextureMode、Material Color、SRTを操作する。
+ImGui::RenderでImGuiの描画データを確定する。
+
+/// --- 5_描画コマンドを積む ---
+1_BackBufferをPRESENTからRENDER_TARGETへ遷移する。
+2_RTVとDSVを描画先に設定する。
+3_画面とDepthBufferをクリアする。
+4_SRV DescriptorHeapを設定する。
+5_ViewportとScissorRectを設定する。
+6_RootSignatureとPSOを設定する。
+7_VertexBufferとPrimitiveTopologyを設定する。
+8_MaterialとWVPのConstantBufferを設定する。
+9_ImGuiで選択したTextureのSRVを設定する。
+10_Production ModeではParticleごとに別のWVPアドレスを設定し、各Particleを3頂点で描画する。
+11_DrawInstancedをCommandListへ積む。
+12_3D描画の後にSprite専用のVertexBuffer、Material、WVP、Textureを設定して6頂点を描画する。
+13_ImGuiの描画コマンドを積む。
+14_BackBufferをRENDER_TARGETからPRESENTへ戻す。
+
+/// --- 6_コマンドの実行 ---
+1_CommandListをCloseして記録を確定する。
+2_CommandQueueからGPUへCommandListを渡す。
+3_SwapChainのPresentで画面を表示する。
+4_FenceでGPUの完了を待つ。
+5_CommandAllocatorとCommandListをResetする。
+
+
+///// ----- 終了処理の流れ ----- /////
+
+/// --- 1_ImGui ---
+ImGuiのDirectX 12、Win32、Contextを終了する。
+
+/// --- 2_描画リソース ---
+VertexBuffer、ConstantBuffer、Texture、DepthStencilTextureを解放する。
+
+/// --- 3_クラスが所有するリソース ---
+PipelineStateがPSO、ShaderBlob、RootSignature、DXCを解放する。
+CommandContextがFence、CommandList、CommandAllocator、CommandQueueを解放する。
+ParticleSystemがParticleごとのWVPResourceを解放する。
+SpriteがVertexBuffer、MaterialResource、WVPResourceを解放する。
+
+/// --- 4_DirectX 12全体 ---
+DescriptorHeap、SwapChain、BackBuffer、Device、Adapter、DXGIFactoryの順に解放する。
+最後にCOMを終了する。
+
+
+///// ----- クラス分けの考え方 ----- /////
+
+/// --- クラスへ分けるもの ---
+次の条件を持つものはクラスへ分ける。
+
+・InitializeとFinalizeがある。
+・複数のDirectXリソースをまとめて所有する。
+・ほかの場所から何度も利用する。
+・main.cppにあると描画の流れが読みにくくなる。
+
+/// --- PipelineStateが所有するクラス ---
+PipelineStateは、PSOを構成する次のクラスを所有する。
+
+・RootSignature
+・InputLayout
+・BlendState
+・RasterizerState
+・DepthStencilState
+・ShaderProgram
+
+各クラスは1種類の設定だけを担当し、PipelineStateがInitializeの順序とPSOへの組み込みを管理する。
+main.cppはPipelineStateを初期化し、描画時にRootSignatureとPSOを取得して使用する。
+
+D3D12_INPUT_ELEMENT_DESC inputElementDescs_[3]{};
+[3]：要素数3の配列
+{}：配列内の全要素をゼロ初期化
+;：宣言の終わり
+
+単位球、位置をそのまま法線として利用すると頂点の向いている方向ともなる
+vertexData[index].normal.x = vertexData[index].position.x;
+vertexData[index].normal.y = vertexData[index].position.y;
+vertexData[index].normal.z = vertexData[index].position.z;
+
+Spriteは-zの方向を向きとしておくと良い
+vertexDataSprite[0].normal = {0.0f, 0.0f, -1.0f};

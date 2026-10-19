@@ -364,3 +364,14 @@ FodyWeavers.xsd
 
 *.log
 /logs
+
+# dumpファイルはバージョン管理する必要のないファイルなので、管理対象から外しておく
+*.dmp
+Dumps/
+
+imgui.ini
+
+hlsl
+
+# gitignoreでobjをアップできるようにする
+!resources/**/*.obj

@@ -13,10 +13,292 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="imgui">
+      <UniqueIdentifier>{3d1d326f-cd11-4123-b415-d93ce3554fdd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="BlendState.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="BufferResource.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="DepthStencilState.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="DepthStencilView.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="DescriptorHeap.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="InputLayout.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="RasterizerState.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderProgram.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderResourceView.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="VertexBuffer.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandContext.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="DxcCompiler.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorObject.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Logger.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Matrix4x4.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Object3D.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Vector.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="PipelineState.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleSystem.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Primitive3D.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Sprite.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneRenderTexture.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="RootSignature.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_demo.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_draw.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_impl_dx12.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_impl_win32.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_tables.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_widgets.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="Sphere.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Matrix3x3.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelLoader.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Model.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="ResourceObject.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectInput.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="DebugCamera.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Window.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Object3d.VS.hlsl" />
+    <FxCompile Include="Object3d.PS.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Matrix4x4.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Object3D.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imconfig.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_impl_dx12.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_impl_win32.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imgui_internal.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imstb_rectpack.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imstb_textedit.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="externals\imgui\imstb_truetype.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Collision.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandContext.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DxcCompiler.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorObject.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="PipelineState.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleSystem.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Primitive3D.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Sprite.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneRenderTexture.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="RootSignature.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Sphere.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Material.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="TransformationMatrix.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectionalLight.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Matrix3x3.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelLoader.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Model.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceObject.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectInput.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DebugCamera.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Window.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="BlendState.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="BufferResource.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DepthStencilState.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DepthStencilView.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="DescriptorHeap.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="InputLayout.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="RasterizerState.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderProgram.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderResourceView.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureManager.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VertexBuffer.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="VertexData.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <Text Include="Memo.txt" />
+    <Text Include="externals\imgui\LICENSE.txt">
+      <Filter>imgui</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Object3d.hlsli" />
   </ItemGroup>
 </Project>
