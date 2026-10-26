@@ -1,5 +1,7 @@
 #pragma once
 
+#include "CommandContext.h"
+
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl.h>
@@ -38,12 +40,36 @@ public:
 		return device_.Get();
 	}
 
+	/// <summary>
+	/// DXGIファクトリー
+	/// </summary>
+	/// <returns></returns>
 	IDXGIFactory7* GetDxgiFactory() const {
 		return dxgiFactory_.Get();
 	}
 
+	/// <summary>
+	/// GPUの名前
+	/// </summary>
+	/// <returns></returns>
 	const std::string& GetAdapterName() const {
 		return adapterName_;
+	}
+
+	/// <summary>
+	/// コマンドの記録と実行を管理
+	/// </summary>
+	/// <returns></returns>
+	CommandContext* GetCommandContext() {
+		return &commandContext_;
+	}
+
+	/// <summary>
+	/// コマンドリスト
+	/// </summary>
+	/// <returns></returns>
+	ID3D12GraphicsCommandList* GetCommandList() const {
+		return commandContext_.GetCommandList();
 	}
 
 	///// ----- ===== ----- /////
@@ -56,6 +82,11 @@ private:
 	/// </summary>
 	/// <param name="logStream"></param>
 	void InitializeDevice(std::ostream& logStream);
+
+	/// <summary>
+	/// コマンド関連の初期化 (CommandQueue Allocator List Fence)
+	/// </summary>
+	void InitializeCommand();
 
 	///// ----- ===== ----- /////
 
@@ -72,6 +103,9 @@ private:
 
 	// 使用しているGPUの名前 (画面表示用)
 	std::string adapterName_;
+
+	// コマンドの記録と実行を管理 (Fenceも含む)
+	CommandContext commandContext_;
 
 	///// ----- ===== ----- /////
 };

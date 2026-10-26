@@ -860,7 +860,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 初期化
 		graphicsDevice = new GraphicsDevice;
-		graphicsDevice->Initialize(window,logStream);
+		graphicsDevice->Initialize(window, logStream);
 
 		// GraphicsDeviceが作ったデバイスを借りる
 		ID3D12Device* device = graphicsDevice->GetDevice();
@@ -868,15 +868,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// スワップチェーンの生成で使うDXGiファクトリーを借りる (スワップチェーンを移したら消す)
 		IDXGIFactory7* dxgiFactory = graphicsDevice->GetDxgiFactory();
 
-		///// ----- CommandContext ----- /////
+		/// --- CommandContext ---
 
-		/// --- 初期化 ---
-		// コマンドの記録と実行を管理する
-		CommandContext commandContext;
-		commandContext.Initialize(device);
-
+		// GraphicsDeviceが持つコマンド管理を借りる
+		CommandContext* commandContext = graphicsDevice->GetCommandContext();
 		// 描画コマンドを積むCommandListを取得する
-		ID3D12GraphicsCommandList* commandList = commandContext.GetCommandList();
+		ID3D12GraphicsCommandList* commandList = graphicsDevice->GetCommandList();
 
 		/// --- SwapChainの生成 ---
 		ComPtr<IDXGISwapChain4> swapChain;
@@ -890,7 +887,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;	 // モニターにうつしたら、中身を廃棄
 		// コマンドキュー、ウィンドウハンドル、設定を渡して生成する。
 		hr = dxgiFactory->CreateSwapChainForHwnd(
-			commandContext.GetCommandQueue(),
+			commandContext->GetCommandQueue(),
 			window->GetHwnd(),
 			&swapChainDesc,
 			nullptr,
@@ -1086,7 +1083,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		/// --- Texture転送コマンドの実行 ---
 		// コマンドを実行してGPUの完了を待つ
-		commandContext.ExecuteAndWait();
+		commandContext->ExecuteAndWait();
 
 		// 転送が終わったのでソースは解放する
 		// GPUへの転送が終わったので転送用リソースを解放する
@@ -1390,7 +1387,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// Dear ImGuiのDirectX 12初期化情報をまとめる
 		ImGui_ImplDX12_InitInfo initInfo{};
 		initInfo.Device = device;
-		initInfo.CommandQueue = commandContext.GetCommandQueue();
+		initInfo.CommandQueue = commandContext->GetCommandQueue();
 		initInfo.NumFramesInFlight = swapChainDesc.BufferCount;
 		initInfo.RTVFormat = rtvDesc.Format;
 		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
@@ -1537,7 +1534,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// (エディター無効時はBackBufferを1280x720のままにして、ウィンドウに合わせて引き伸ばして表示する)
 			if (clientWidth != backBufferWidth || clientHeight != backBufferHeight) {
 				// ResizeBuffers前にGPUのBackBuffer参照を完了させる
-				commandContext.ExecuteAndWait();
+				commandContext->ExecuteAndWait();
 				for (ComPtr<ID3D12Resource>& backBuffer : swapChainResources) {
 					// ResizeBuffersの前にBackBufferの参照を解放する
 					backBuffer.Reset();
@@ -2578,7 +2575,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			/// --- コマンドの実行 ---
 			// コマンドを実行して画面を表示する
-			commandContext.ExecuteAndPresent(swapChain.Get());
+			commandContext->ExecuteAndPresent(swapChain.Get());
 #pragma endregion コマンドを積む処理
 
 		} // whileの終わり
@@ -2617,7 +2614,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 		pipelineState.Finalize();
 		normalBlendPipelineState.Finalize();
-		commandContext.Finalize();
+		commandContext->Finalize();
 
 		/// --- 4_ディスクリプタヒープ ---
 		rtvDescriptorHeap.Finalize();

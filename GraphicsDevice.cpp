@@ -24,7 +24,8 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 	// デバイスの初期化 (ID3D12Device)
 	InitializeDevice(logStream);
 
-
+	// コマンド関連の初期化
+	InitializeCommand();
 
 
 }
@@ -33,6 +34,9 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 /// 終了
 /// </summary>
 void GraphicsDevice::Finalize() {
+
+	// コマンド関連を開放する
+	commandContext_.Finalize();
 
 	// ComPtrなので、デストラクタで自動解放される
 }
@@ -153,4 +157,12 @@ void GraphicsDevice::InitializeDevice(std::ostream& logStream) {
 	}
 #endif // _DEBUG
 
+}
+
+/// <summary>
+/// コマンド関連の初期化
+/// </summary>
+void GraphicsDevice::InitializeCommand() {
+	// CommandQueue・CommandAllocator・CommandList・Fenceを生成する
+	commandContext_.Initialize(device_.Get());
 }
