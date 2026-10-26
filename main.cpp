@@ -25,6 +25,7 @@
 #include "DirectInput.h"
 #include "DebugCamera.h"
 #include "Window.h"
+#include "GraphicsDevice.h"
 
 #include <cstdint> // int32_t
 #include <string> // 文字列
@@ -423,6 +424,7 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Primitive3D& prim
 
 // 描画統計を表示する
 void DrawStatistics(
+	const std::string& adapterName,
 	const ParticleSystem& particleSystem,
 	Camera& camera,
 	DebugCamera& debugCamera,
@@ -443,6 +445,11 @@ void DrawStatistics(
 	ImGui::Text(
 		"FPS : %.1f",
 		ImGui::GetIO().Framerate
+	);
+
+	ImGui::Text(
+		"GPU : %s",
+		adapterName.c_str()
 	);
 
 	ImGui::Text(
@@ -846,119 +853,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 出力ウィンドウへの文字出力
 		OutputDebugStringA("Hello,DirectX!\n");
 
-		/// --- DebugLayer ---
+		/// --- GraphicsDevice DirectX基盤 ---
 
-#ifdef _DEBUG
-		ComPtr<ID3D12Debug1> debugController;
-		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(debugController.GetAddressOf())))) {
-			// デバッグレイヤーを有効化する
-			debugController->EnableDebugLayer();
-			// さらにGPU側でもチェックを行うようにする
-			debugController->SetEnableGPUBasedValidation(TRUE);
-		}
-#endif // _DEBUG
+		// ポインタ
+		GraphicsDevice* graphicsDevice = nullptr;
 
-		/// --- DXGI初期化 ---
+		// 初期化
+		graphicsDevice = new GraphicsDevice;
+		graphicsDevice->Initialize(window,logStream);
 
-		// DXGIファクトリーの生成
-		ComPtr<IDXGIFactory7> dxgiFactory;
+		// GraphicsDeviceが作ったデバイスを借りる
+		ID3D12Device* device = graphicsDevice->GetDevice();
 
-		// HRESULTはWindowsケイのエラーコード、関数が成功したかどうかをSUCCEEDEDマクロで判定できる
-		hr = CreateDXGIFactory(IID_PPV_ARGS(dxgiFactory.GetAddressOf()));
-
-		// 初期化の根本的な部分でエラーが出た場合はプログラムが間違っているか、どうにもできない場合はassertにしておく
-		assert(SUCCEEDED(hr));
-
-		// 使用するアダプタ用の変数、最初にnullptr
-		ComPtr<IDXGIAdapter4> useAdapter;
-
-		// 良い順にアダプタを頼む
-		for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(
-			i,
-			DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-			IID_PPV_ARGS(useAdapter.ReleaseAndGetAddressOf())) != DXGI_ERROR_NOT_FOUND;
-			 ++i) {
-			// アダプターの情報を取得する
-			DXGI_ADAPTER_DESC3 adapterDesc{};
-			hr = useAdapter->GetDesc3(&adapterDesc);
-			assert(SUCCEEDED(hr)); // 取得できないのは一大事
-
-			// ソフトウェアアダプタでなければ採用
-			if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE)) {
-				// 採用したアダプタの情報をログに出力。wstringの方なので注意
-				Log(logStream, std::format(L"Use Adapter:{}\n", adapterDesc.Description));
-				break;
-			}
-			useAdapter = nullptr; // ソフトウェアアダプタの場合は見なかったことにする
-		}
-
-		// 適切なアダプタが見つからなかったので起動できない
-		assert(useAdapter != nullptr);
-
-		// --- D3D12Deviceの生成 ---
-		ComPtr<ID3D12Device> device;
-		// 機能レベルとログ出力用の文字列
-		D3D_FEATURE_LEVEL featureLevels[]{
-			D3D_FEATURE_LEVEL_12_2, D3D_FEATURE_LEVEL_12_1, D3D_FEATURE_LEVEL_12_0};
-		const char* featureLevelStrings[] = {"12.2", "12.1", "12.0"};
-		// 高い順に生成できるか試していく
-		for (size_t i = 0; i < _countof(featureLevels); ++i) {
-			// 採用したアダプターでデバイスを生成
-			hr = D3D12CreateDevice(
-				useAdapter.Get(),
-				featureLevels[i],
-				IID_PPV_ARGS(device.ReleaseAndGetAddressOf()));
-			// 指定した機能レベルでデバイスが生成できたかを確認
-			if (SUCCEEDED(hr)) {
-				// 生成できたのでログ出力を行ってループを抜ける
-				Log(logStream, std::format("FeatureLevel : {}\n", featureLevelStrings[i]));
-				break; // 生成できたらループを抜ける
-			}
-		}
-
-		// デバイスの生成がうまくいかなかったので起動できない
-		assert(device != nullptr);
-		Log(logStream, "Complete create D3D12Device!!!\n"); // 初期化完了のログを出す
-
-		// エラー・警告を実行時にプログラムを停止させる、deviceに対して行う
-#ifdef _DEBUG
-		ComPtr<ID3D12InfoQueue> infoQueue;
-		if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(infoQueue.GetAddressOf())))) {
-			// やばいエラー時に止まる
-			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
-			// エラー時に止まる
-			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-			// 警告時に止まる(ここをコメントアウトしたら全部の情報が出力される、詳細な情報をログに出力することができる)
-			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
-
-			// エラーと警告の抑制
-			// 抑制するメッセージのID
-			D3D12_MESSAGE_ID denyIds[] = {
-				// windows11でのDXGIデバッグレイヤーとDX12デバッグレイヤーの相互作用バクによるエラーメッセージ
-				// https://stackoverflow.com/questions/69805245/directx-12-application-is-crashing-in-windows-11
-				D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE};
-
-			// 抑制するレベル
-			D3D12_MESSAGE_SEVERITY severities[] = {D3D12_MESSAGE_SEVERITY_INFO};
-			D3D12_INFO_QUEUE_FILTER filter{};
-			filter.DenyList.NumIDs = _countof(denyIds);
-			filter.DenyList.pIDList = denyIds;
-			filter.DenyList.NumSeverities = _countof(severities);
-			filter.DenyList.pSeverityList = severities;
-			// 指定したメッセージの表示を抑制する
-			infoQueue->PushStorageFilter(&filter);
-
-			// 解放
-			// infoQueueはComPtrが自動解放する
-		}
-#endif // _DEBUG
+		// スワップチェーンの生成で使うDXGiファクトリーを借りる (スワップチェーンを移したら消す)
+		IDXGIFactory7* dxgiFactory = graphicsDevice->GetDxgiFactory();
 
 		///// ----- CommandContext ----- /////
 
 		/// --- 初期化 ---
 		// コマンドの記録と実行を管理する
 		CommandContext commandContext;
-		commandContext.Initialize(device.Get());
+		commandContext.Initialize(device);
 
 		// 描画コマンドを積むCommandListを取得する
 		ID3D12GraphicsCommandList* commandList = commandContext.GetCommandList();
@@ -986,15 +901,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- DescriptorHeapの生成 ---
 		// RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
 		DescriptorHeap rtvDescriptorHeap;
-		rtvDescriptorHeap.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
+		rtvDescriptorHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
 		// SRV用のヒープでディスクリプタの数は128。SRVはShader内で触るものなので、ShaderVisibleはtrue
 		DescriptorHeap srvDescriptorHeap;
-		srvDescriptorHeap.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
+		srvDescriptorHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
 
 		/// --- DepthStencilView ---
 		// DSV用のヒープでディスクリプタの数は1。DSVはShader内で触るものではないので、ShaderVisibleはfalse
 		DescriptorHeap dsvDescriptorHeap;
-		dsvDescriptorHeap.Initialize(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+		dsvDescriptorHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 
 		/// --- SwapChainからResourceを引っ張ってくる ---
 		ComPtr<ID3D12Resource> swapChainResources[2];
@@ -1025,16 +940,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 初期化 ---
 		// RootSignatureと各設定をまとめてPSOを作成する
 		PipelineState pipelineState;
-		pipelineState.Initialize(device.Get(), logStream);
+		pipelineState.Initialize(device, logStream);
 
 		// NormalBlend(半透明)で描画するためのPSO
 		PipelineState normalBlendPipelineState;
-		normalBlendPipelineState.Initialize(device.Get(), logStream, BlendMode::kNormal);
+		normalBlendPipelineState.Initialize(device, logStream, BlendMode::kNormal);
 
 		// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
 		ComPtr<ID3D12Resource> wvpResource;
 		// Createが返した所有権をComPtrへ移す
-		wvpResource = BufferResource::Create(device.Get(), sizeof(TransformationMatrix));
+		wvpResource = BufferResource::Create(device, sizeof(TransformationMatrix));
 		// データを書き込む
 		TransformationMatrix* wvpData = nullptr;
 		// 書き込むためのアドレスを取得
@@ -1051,7 +966,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 最大頂点数
 		const uint32_t kMaxVertexCount = 1024;
 		VertexBuffer vertexBuffer;
-		vertexBuffer.Initialize(device.Get(), kMaxVertexCount);
+		vertexBuffer.Initialize(device, kMaxVertexCount);
 
 		///// ----- Sprite ----- /////
 
@@ -1059,7 +974,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- Sprite専用のVertexBuffer、Material、WVPを作成 ---
 		// 2D専用オブジェクトであることが分かる名前に統一する
 		Sprite2D sprite2D;
-		sprite2D.Initialize(device.Get(), Window::kClientWidth, Window::kClientHeight, 640.0f, 360.0f);
+		sprite2D.Initialize(device, Window::kClientWidth, Window::kClientHeight, 640.0f, 360.0f);
 
 		// 三角形とは別にSpriteのTextureを選択する
 		int spriteTextureMode = 1;
@@ -1081,7 +996,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- Material用のリソースを作る ---
 		ComPtr<ID3D12Resource> materialResource;
 		// Createが返した所有権をComPtrへ移す
-		materialResource = BufferResource::Create(device.Get(), sizeof(Material));
+		materialResource = BufferResource::Create(device, sizeof(Material));
 		// マテリアルにデータを書き込む
 		Material* materialData = nullptr;
 		// 書き込むためのアドレスを取得
@@ -1099,7 +1014,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 平行光源用の定数バッファを作成する ---
 		ComPtr<ID3D12Resource> directionalLightResource;
 		// Createが返した所有権をComPtrへ移す
-		directionalLightResource = BufferResource::Create(device.Get(), sizeof(DirectionalLight));
+		directionalLightResource = BufferResource::Create(device, sizeof(DirectionalLight));
 		// CPUから光源情報を書き込むアドレス
 		DirectionalLight* directionalLightData = nullptr;
 		HRESULT directionalLightMapResult =
@@ -1160,14 +1075,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// Textureを読み込み、GPUへの転送とSRVの作成を行う
 		TextureManager textureManager;
-		textureManager.Initialize(device.Get(), commandList, srvDescriptorHeap);
+		textureManager.Initialize(device, commandList, srvDescriptorHeap);
 
 		///// ----- DSV(Depth Stencil View) ----- /////
 
 		/// --- 初期化 ---
 		// 深度ステンシルテクスチャリソースとDSVを作る
 		DepthStencilView depthStencilView;
-		depthStencilView.Initialize(device.Get(), dsvDescriptorHeap, Window::kClientWidth, Window::kClientHeight);
+		depthStencilView.Initialize(device, dsvDescriptorHeap, Window::kClientWidth, Window::kClientHeight);
 
 		/// --- Texture転送コマンドの実行 ---
 		// コマンドを実行してGPUの完了を待つ
@@ -1207,7 +1122,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// Transformの変数を作る
 		// 3Dオブジェクトの状態をObject3Dへ集約し、既存の描画処理から参照して使う
 		Primitive3D primitive3D;
-		primitive3D.Initialize(device.Get());
+		primitive3D.Initialize(device);
 		Transform& transform = primitive3D.GetTransform();
 
 		// カメラの回転
@@ -1240,7 +1155,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 初期化 ---
 		// 演出モード4で使用する範囲と最大数を設定する
 		ParticleSystem particleSystem;
-		particleSystem.Initialize(device.Get(), -0.9f, 0.9f, 50);
+		particleSystem.Initialize(device, -0.9f, 0.9f, 50);
 
 		///// ----- カメラ ----- /////
 		Camera camera;
@@ -1272,7 +1187,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		Sphere sphere;
 
 		// ImGuiでは1～32分割まで変更できるようにする
-		sphere.Initialize(device.Get(), 32);
+		sphere.Initialize(device, 32);
 
 		// Sphereのテクスチャ切り替え用の選択番号
 		int sphereTextureMode = 3;
@@ -1285,7 +1200,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// resourcesフォルダのplane.objを読み込む
 		planeModel.Initialize(
-			device.Get(),
+			device,
 			"resources",
 			"plane.obj");
 
@@ -1307,7 +1222,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// resourcesフォルダのaxis.objを読み込む
 		axisModel.Initialize(
-			device.Get(),
+			device,
 			"resources",
 			"axis.obj");
 
@@ -1326,7 +1241,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 複数Meshが含まれているOBJファイルを読み込む
 		multiMeshModel.Initialize(
-			device.Get(),
+			device,
 			"resources",
 			"multiMesh.obj");
 
@@ -1348,7 +1263,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 複数Materialを使用するOBJファイルを読み込む
 		multiMaterialModel.Initialize(
-			device.Get(),
+			device,
 			"resources",
 			"multiMaterial.obj");
 
@@ -1371,7 +1286,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// Model::InitializeからModelLoaderを通してbunny.objを読み込む
 		bunnyModel.Initialize(
-			device.Get(),
+			device,
 			"resources",
 			"bunny.obj");
 
@@ -1398,7 +1313,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// Model::InitializeからModelLoaderを通してteapot.objを読み込む
 		teapotModel.Initialize(
-			device.Get(),
+			device,
 			"resources",
 			"teapot.obj");
 
@@ -1425,7 +1340,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// Model::InitializeからModelLoaderを通してsuzanne.objを読み込む
 		suzanneModel.Initialize(
-			device.Get(),
+			device,
 			"resources",
 			"suzanne.obj");
 
@@ -1454,7 +1369,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		SceneRenderTexture sceneRenderTexture;
 		sceneRenderTexture.Initialize(
-			device.Get(),
+			device,
 			srvDescriptorHeap,
 			kSceneSrvDescriptorIndex,
 			Window::kClientWidth,
@@ -1474,7 +1389,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// Dear ImGuiのDirectX 12初期化情報をまとめる
 		ImGui_ImplDX12_InitInfo initInfo{};
-		initInfo.Device = device.Get();
+		initInfo.Device = device;
 		initInfo.CommandQueue = commandContext.GetCommandQueue();
 		initInfo.NumFramesInFlight = swapChainDesc.BufferCount;
 		initInfo.RTVFormat = rtvDesc.Format;
@@ -1870,6 +1785,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			DrawContentBrowserAssets(textureManager);
 			DrawStatistics(
+				graphicsDevice->GetAdapterName(),
 				particleSystem,
 				camera,
 				debugCamera,
@@ -2729,6 +2645,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 動的に生成したインスタンスを削除する
 		delete input;
 		input = nullptr;
+
+		/// --- graphicsDevice ---
+
+		// DirectX12の描画の基盤の終了処理
+		graphicsDevice->Finalize();
+		delete graphicsDevice;
+		graphicsDevice = nullptr;
 
 		// WindowsAPIの終了処理 (ウィンドウを閉じて、COMを終了する)
 		window->Finalize();
