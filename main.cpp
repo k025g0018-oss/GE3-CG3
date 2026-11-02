@@ -2614,7 +2614,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 		pipelineState.Finalize();
 		normalBlendPipelineState.Finalize();
-		commandContext->Finalize();
 
 		/// --- 4_ディスクリプタヒープ ---
 		rtvDescriptorHeap.Finalize();
