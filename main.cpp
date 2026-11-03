@@ -878,18 +878,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// スワップチェーンの設定を借りる (ImGuiの初期化とリサイズで使う)
 		const DXGI_SWAP_CHAIN_DESC1& swapChainDesc = graphicsDevice->GetSwapChainDesc();
 
-		/// --- DescriptorHeapの生成 ---
-		// RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
-		DescriptorHeap rtvDescriptorHeap;
-		rtvDescriptorHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 2, false);
-		// SRV用のヒープでディスクリプタの数は128。SRVはShader内で触るものなので、ShaderVisibleはtrue
-		DescriptorHeap srvDescriptorHeap;
-		srvDescriptorHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 128, true);
+		/// --- DescriptorHeap ---
 
-		/// --- DepthStencilView ---
-		// DSV用のヒープでディスクリプタの数は1。DSVはShader内で触るものではないので、ShaderVisibleはfalse
-		DescriptorHeap dsvDescriptorHeap;
-		dsvDescriptorHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+		// GraphicsDeviceが作った各種ディスクリプタヒープを借りる
+		DescriptorHeap& rtvDescriptorHeap = graphicsDevice->GetRtvDescriptorHeap();
+		DescriptorHeap& srvDescriptorHeap = graphicsDevice->GetSrvDescriptorHeap();
+		DescriptorHeap& dsvDescriptorHeap = graphicsDevice->GetDsvDescriptorHeap();
 
 		/// --- バックバッファ ---
 
@@ -2596,11 +2590,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 		pipelineState.Finalize();
 		normalBlendPipelineState.Finalize();
-
-		/// --- 4_ディスクリプタヒープ ---
-		rtvDescriptorHeap.Finalize();
-		srvDescriptorHeap.Finalize();
-		dsvDescriptorHeap.Finalize();
 
 		/// --- 5_スワップチェーンとバックバッファリソース ///
 		// ReportLiveObjectsより前にComPtrが所有するオブジェクトを解放する

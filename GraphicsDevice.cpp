@@ -27,20 +27,22 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 	// コマンド関連の初期化
 	InitializeCommand();
 
-	// デバイスの初期化 (ID3D12Device)
-	InitializeDevice(logStream);
-
-	// コマンド関連の初期化
-	InitializeCommand();
-
 	// スワップチェーンの生成
 	InitializeSwapChain();
+
+	// 各種ディスクリプタヒープの生成
+	InitializeDescriptorHeaps();
 }
 
 /// <summary>
 /// 終了
 /// </summary>
 void GraphicsDevice::Finalize() {
+
+	// 各種ディスクリプタヒープを解放する
+	rtvDescriptorHeap_.Finalize();
+	srvDescriptorHeap_.Finalize();
+	dsvDescriptorHeap_.Finalize();
 
 	// コマンド関連を開放する
 	commandContext_.Finalize();
@@ -207,4 +209,19 @@ void GraphicsDevice::InitializeSwapChain() {
 		hr = swapChain_->GetBuffer(index, IID_PPV_ARGS(swapChainResources_[index].GetAddressOf()));
 		assert(SUCCEEDED(hr));
 	}
+}
+
+/// <summary>
+/// 各種ディスクリプタヒープの生成
+/// </summary>
+void GraphicsDevice::InitializeDescriptorHeaps() {
+
+	// RTV用のヒープ。バックバッファの数だけ作る。RTVはShader内で触るものではないので、ShaderVisibleはfalse
+	rtvDescriptorHeap_.Initialize(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kBackBufferCount, false);
+
+	// SRV用のヒープ。SRVはShader内で触るものなので、ShaderVisibleはtrue
+	srvDescriptorHeap_.Initialize(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kSrvDescriptorCount, true);
+
+	// DSV用のヒープ。深度バッファは1つ。DSVはShader内で触るものではないので、ShaderVisibleはfalse
+	dsvDescriptorHeap_.Initialize(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 }

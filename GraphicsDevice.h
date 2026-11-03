@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CommandContext.h"
+#include "DescriptorHeap.h"														
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -35,6 +36,9 @@ public:
 
 	// バックバッファの枚数 (ダブルバッファ)
 	static const UINT kBackBufferCount = 2;
+
+	// SRV用ディスクリプタヒープに確保する数 (テクスチャとImGuiで使う)
+	static const UINT kSrvDescriptorCount = 128;
 
 	///// ----- ===== ----- /////
 
@@ -101,6 +105,27 @@ public:
 		return swapChainResources_;
 	}
 
+	/// <summary>
+	/// RTV用ディスクリプタヒープ
+	/// </summary>
+	DescriptorHeap& GetRtvDescriptorHeap() {
+		return rtvDescriptorHeap_;
+	}
+
+	/// <summary>
+	/// SRV用ディスクリプタヒープ
+	/// </summary>
+	DescriptorHeap& GetSrvDescriptorHeap() {
+		return srvDescriptorHeap_;
+	}
+
+	/// <summary>
+	/// DSV用ディスクリプタヒープ
+	/// </summary>
+	DescriptorHeap& GetDsvDescriptorHeap() {
+		return dsvDescriptorHeap_;
+	}
+
 	///// ----- ===== ----- /////
 
 private:
@@ -121,6 +146,11 @@ private:
 	/// スワップチェーンの生成とバックバッファの取得
 	/// </summary>
 	void InitializeSwapChain();
+
+	/// <summary>
+	/// 各種ディスクリプタヒープの生成 (RTV・SRV・DSV)
+	/// </summary>
+	void InitializeDescriptorHeaps();
 
 	///// ----- ===== ----- /////
 
@@ -149,6 +179,15 @@ private:
 
 	// バックバッファ (スワップチェーンのリソース)
 	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kBackBufferCount> swapChainResources_;
+
+	// RTV用ディスクリプタヒープ (バックバッファの数だけ)
+	DescriptorHeap rtvDescriptorHeap_;
+
+	// SRV用ディスクリプタヒープ (テクスチャとImGuiで使う)
+	DescriptorHeap srvDescriptorHeap_;
+
+	// DSV用ディスクリプタヒープ (深度バッファ1つ分)
+	DescriptorHeap dsvDescriptorHeap_;
 
 	///// ----- ===== ----- /////
 };
