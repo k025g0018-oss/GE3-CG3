@@ -53,14 +53,6 @@ public:
 	}
 
 	/// <summary>
-	/// DXGIファクトリー
-	/// </summary>
-	/// <returns></returns>
-	IDXGIFactory7* GetDxgiFactory() const {
-		return dxgiFactory_.Get();
-	}
-
-	/// <summary>
 	/// GPUの名前
 	/// </summary>
 	/// <returns></returns>
@@ -105,12 +97,6 @@ public:
 		return swapChainResources_;
 	}
 
-	/// <summary>
-	/// RTV用ディスクリプタヒープ
-	/// </summary>
-	DescriptorHeap& GetRtvDescriptorHeap() {
-		return rtvDescriptorHeap_;
-	}
 
 	/// <summary>
 	/// SRV用ディスクリプタヒープ
@@ -124,6 +110,20 @@ public:
 	/// </summary>
 	DescriptorHeap& GetDsvDescriptorHeap() {
 		return dsvDescriptorHeap_;
+	}
+
+	/// <summary>
+	/// RTVの設定 (フォーマットはImGuiやSceneRenderTextureでも使う)
+	/// </summary>
+	const D3D12_RENDER_TARGET_VIEW_DESC& GetRtvDesc() const {
+		return rtvDesc_;
+	}
+
+	/// <summary>
+	/// バックバッファごとのRTVのハンドル
+	/// </summary>
+	const std::array<D3D12_CPU_DESCRIPTOR_HANDLE, kBackBufferCount>& GetRtvHandles() const {
+		return rtvHandles_;
 	}
 
 	///// ----- ===== ----- /////
@@ -151,6 +151,11 @@ private:
 	/// 各種ディスクリプタヒープの生成 (RTV・SRV・DSV)
 	/// </summary>
 	void InitializeDescriptorHeaps();
+
+	/// <summary>
+	/// レンダーターゲットビューの生成
+	/// </summary>
+	void InitializeRenderTargetView();
 
 	///// ----- ===== ----- /////
 
@@ -188,6 +193,12 @@ private:
 
 	// DSV用ディスクリプタヒープ (深度バッファ1つ分)
 	DescriptorHeap dsvDescriptorHeap_;
+
+	// RTVの設定
+	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_{};
+
+	// バックバッファごとのRTVのハンドル
+	std::array<D3D12_CPU_DESCRIPTOR_HANDLE, kBackBufferCount> rtvHandles_{};
 
 	///// ----- ===== ----- /////
 };

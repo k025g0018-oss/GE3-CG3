@@ -881,7 +881,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- DescriptorHeap ---
 
 		// GraphicsDeviceが作った各種ディスクリプタヒープを借りる
-		DescriptorHeap& rtvDescriptorHeap = graphicsDevice->GetRtvDescriptorHeap();
 		DescriptorHeap& srvDescriptorHeap = graphicsDevice->GetSrvDescriptorHeap();
 		DescriptorHeap& dsvDescriptorHeap = graphicsDevice->GetDsvDescriptorHeap();
 
@@ -891,22 +890,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		std::array<ComPtr<ID3D12Resource>, GraphicsDevice::kBackBufferCount>& swapChainResources =
 			graphicsDevice->GetSwapChainResources();
 
-		// --- RTVを作る ---
-		// RTVの設定
-		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;	   // 出力結果をSRGBに変換して書き込む
-		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; // 2dテクスチャとして書き込む
-		// ディスクリプタの先頭を取得する
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap.GetCPUHandleStart();
-		// RTVを2つ作るのでディスクリプタを2つ用意
-		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
-		// まず1つ目を作る。1つ目は最初のところに作る。作る場所をこちらで指定してあげる必要がある。
-		rtvHandles[0] = rtvStartHandle;
-		device->CreateRenderTargetView(swapChainResources[0].Get(), &rtvDesc, rtvHandles[0]);
-		// 2つ目のディスクリプタハンドルを得る(自力で)
-		rtvHandles[1].ptr = rtvHandles[0].ptr + device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		// 2つ目を作る
-		device->CreateRenderTargetView(swapChainResources[1].Get(), &rtvDesc, rtvHandles[1]);
+		/// --- RTV ---
+
+		// GraphicsDeviceが作ったRTVの設定を借りる (ImGuiとリサイズで使う)
+		const D3D12_RENDER_TARGET_VIEW_DESC& rtvDesc = graphicsDevice->GetRtvDesc();
+		// GraphicsDeviceが作ったRTVのハンドルを借りる (描画先の指定とリサイズで使う)
+		const std::array<D3D12_CPU_DESCRIPTOR_HANDLE, GraphicsDevice::kBackBufferCount>& rtvHandles =
+			graphicsDevice->GetRtvHandles();
 
 		///// ----- PSO(Pipeline State Object) ----- /////
 

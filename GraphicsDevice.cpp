@@ -32,6 +32,9 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 
 	// 各種ディスクリプタヒープの生成
 	InitializeDescriptorHeaps();
+
+	// レンダーターゲットビューの生成
+	InitializeRenderTargetView();
 }
 
 /// <summary>
@@ -224,4 +227,22 @@ void GraphicsDevice::InitializeDescriptorHeaps() {
 
 	// DSV用のヒープ。深度バッファは1つ。DSVはShader内で触るものではないので、ShaderVisibleはfalse
 	dsvDescriptorHeap_.Initialize(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+}
+
+/// <summary>
+/// レンダーターゲットビューの生成
+/// </summary>
+void GraphicsDevice::InitializeRenderTargetView() {
+
+	// RTVの設定
+	rtvDesc_.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;	   // 出力結果をSRGBに変換して書き込む
+	rtvDesc_.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D; // 2dテクスチャとして書き込む
+
+	// バックバッファの数だけRTVを作る
+	for (UINT index = 0; index < kBackBufferCount; ++index) {
+		// RTV用ヒープのindex番目の場所を取得する
+		rtvHandles_[index] = rtvDescriptorHeap_.GetCPUHandle(index);
+		// その場所に、バックバッファのRTVを作る
+		device_->CreateRenderTargetView(swapChainResources_[index].Get(), &rtvDesc_, rtvHandles_[index]);
+	}
 }
