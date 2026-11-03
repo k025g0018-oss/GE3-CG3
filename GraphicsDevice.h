@@ -4,6 +4,7 @@
 #include "DescriptorHeap.h"
 #include "DepthStencilView.h"
 #include "DxcCompiler.h"
+#include "Window.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -11,9 +12,6 @@
 #include <ostream>
 #include <string>
 #include <array>
-
-// ポインタしか使わないので前方宣言
-class Window;
 
 /// <summary>
 /// DirectX基盤
@@ -31,6 +29,12 @@ public:
 	/// 終了
 	/// </summary>
 	void Finalize();
+
+	/// <summary>
+	/// ウィンドウの大きさに合わせてバックバッファを作り直す
+	/// </summary>
+	/// <returns>作り直したらtrue (大きさが同じなら何もしないでfalse)</returns>
+	bool Resize(uint32_t width, uint32_t height);
 
 	///// ----- ===== ----- /////
 
@@ -93,12 +97,11 @@ public:
 	}
 
 	/// <summary>
-	/// バックバッファ (リサイズで作り直すので書き換えられる参照で返す)
+	/// バックバッファ
 	/// </summary>
-	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kBackBufferCount>& GetSwapChainResources() {
+	const std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kBackBufferCount>& GetSwapChainResources() const {
 		return swapChainResources_;
 	}
-
 
 	/// <summary>
 	/// SRV用ディスクリプタヒープ
@@ -154,6 +157,20 @@ public:
 	/// </summary>
 	DxcCompiler* GetDxcCompiler() {
 		return &dxcCompiler_;
+	}
+
+	/// <summary>
+	/// バックバッファ全体のビューポート (ImGuiを描くときに使う)
+	/// </summary>
+	const D3D12_VIEWPORT& GetBackBufferViewport() const {
+		return backBufferViewport_;
+	}
+
+	/// <summary>
+	/// バックバッファ全体のシザー矩形 (ImGuiを描くときに使う)
+	/// </summary>
+	const D3D12_RECT& GetBackBufferScissorRect() const {
+		return backBufferScissorRect_;
 	}
 
 	///// ----- ===== ----- /////
@@ -261,6 +278,16 @@ private:
 
 	// シェーダーのコンパイラ (1つをみんなで使う)
 	DxcCompiler dxcCompiler_;
+
+	// 今のバックバッファの大きさ (リサイズが必要か判定する)
+	uint32_t backBufferWidth_ = Window::kClientWidth;
+	uint32_t backBufferHeight_ = Window::kClientHeight;
+
+	// バックバッファ全体のビューポート (ウィンドウの大きさに追従する)
+	D3D12_VIEWPORT backBufferViewport_{};
+
+	// バックバッファ全体のシザー矩形 (ウィンドウの大きさに追従する)
+	D3D12_RECT backBufferScissorRect_{};
 
 	///// ----- ===== ----- /////
 };

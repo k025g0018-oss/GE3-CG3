@@ -287,6 +287,9 @@ void GraphicsDevice::InitializeViewport() {
 	viewport_.TopLeftY = 0.0f;
 	viewport_.MinDepth = 0.0f;
 	viewport_.MaxDepth = 1.0f;
+
+	// バックバッファ全体用も、最初はゲーム画面と同じ大きさにしておく
+	backBufferViewport_ = viewport_;
 }
 
 /// <summary>
@@ -299,12 +302,63 @@ void GraphicsDevice::InitializeScissorRect() {
 	scissorRect_.right = Window::kClientWidth;
 	scissorRect_.top = 0;
 	scissorRect_.bottom = Window::kClientHeight;
+
+	// バックバッファ全体用も、最初はゲーム画面と同じ大きさにしておく
+	backBufferScissorRect_ = scissorRect_;
 }
 
 /// <summary>
 /// DXCコンパイラの初期化
 /// </summary>
 void GraphicsDevice::InitializeDxcCompiler() {
+
 	// DxcUtils・DxcCompiler・IncludeHandlerを生成する
 	dxcCompiler_.Initialize();
+}
+
+/// <summary>
+/// ウィンドウの大きさに合わせてバックバッファを作り直す
+/// </summary>
+bool GraphicsDevice::Resize(uint32_t width, uint32_t height) {
+
+	// 大きさが変わっていなければ何もしない
+	if (width == backBufferWidth_ && height == backBufferHeight_) {
+		return false;
+	}
+
+	// ResizeBuffers前にGPUのBackBuffer参照を完了させる
+	commandContext_.ExecuteAndWait();
+
+	// ResizeBuffersの前にBackBufferの参照を解放する
+	for (Microsoft::WRL::ComPtr<ID3D12Resource>& backBuffer : swapChainResources_) {
+		backBuffer.Reset();
+	}
+
+	// バックバッファを新しい大きさで作り直す
+	HRESULT hr = swapChain_->ResizeBuffers(
+		swapChainDesc_.BufferCount,
+		width,
+		height,
+		swapChainDesc_.Format,
+		0);
+	assert(SUCCEEDED(hr));
+
+	// 作り直したバックバッファを取得して、RTVも作り直す
+	for (UINT index = 0; index < kBackBufferCount; ++index) {
+		hr = swapChain_->GetBuffer(index, IID_PPV_ARGS(swapChainResources_[index].GetAddressOf()));
+		assert(SUCCEEDED(hr));
+		device_->CreateRenderTargetView(swapChainResources_[index].Get(), &rtvDesc_, rtvHandles_[index]);
+	}
+
+	// 新しい大きさを記録する
+	backBufferWidth_ = width;
+	backBufferHeight_ = height;
+
+	// バックバッファ全体のビューポートとシザー矩形も新しい大きさにする
+	backBufferViewport_.Width = static_cast<float>(width);
+	backBufferViewport_.Height = static_cast<float>(height);
+	backBufferScissorRect_.right = static_cast<LONG>(width);
+	backBufferScissorRect_.bottom = static_cast<LONG>(height);
+
+	return true;
 }

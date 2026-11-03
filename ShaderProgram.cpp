@@ -1,4 +1,5 @@
 #include "ShaderProgram.h"
+#include "DxcCompiler.h"
 
 #include <cassert>
 

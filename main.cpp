@@ -886,7 +886,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- バックバッファ ---
 
 		// GraphicsDeviceが取得したバックバッファを借りる (リサイズで作り直すので参照で受け取る)
-		std::array<ComPtr<ID3D12Resource>, GraphicsDevice::kBackBufferCount>& swapChainResources =
+		const std::array<ComPtr<ID3D12Resource>, GraphicsDevice::kBackBufferCount>& swapChainResources =
 			graphicsDevice->GetSwapChainResources();
 
 		/// --- RTV ---
@@ -1049,11 +1049,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		textureManager.ReleaseIntermediateResources();
 
 		// ImGuiを描画するSwapChain側は、実際のウィンドウサイズへ追従させる
-		uint32_t backBufferWidth = Window::kClientWidth;
-		uint32_t backBufferHeight = Window::kClientHeight;
-		// ゲーム画面用をコピーして、リサイズに合わせて書き換える
-		D3D12_VIEWPORT editorViewport = graphicsDevice->GetViewport();
-		D3D12_RECT editorScissorRect = graphicsDevice->GetScissorRect();
+		// ->GraphicsDevice が持っている。
 
 		///// ----- 変数の宣言 ----- /////
 
@@ -1474,35 +1470,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// エディター有効時は、WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
 			// (エディター無効時はBackBufferを1280x720のままにして、ウィンドウに合わせて引き伸ばして表示する)
-			if (clientWidth != backBufferWidth || clientHeight != backBufferHeight) {
-				// ResizeBuffers前にGPUのBackBuffer参照を完了させる
-				commandContext->ExecuteAndWait();
-				for (ComPtr<ID3D12Resource>& backBuffer : swapChainResources) {
-					// ResizeBuffersの前にBackBufferの参照を解放する
-					backBuffer.Reset();
-				}
-
-				HRESULT resizeResult = swapChain->ResizeBuffers(
-					swapChainDesc.BufferCount,
-					clientWidth,
-					clientHeight,
-					swapChainDesc.Format,
-					0);
-				assert(SUCCEEDED(resizeResult));
-
-				for (uint32_t index = 0; index < swapChainDesc.BufferCount; ++index) {
-					resizeResult = swapChain->GetBuffer(
-						index,
-						IID_PPV_ARGS(swapChainResources[index].GetAddressOf()));
-					assert(SUCCEEDED(resizeResult));
-					device->CreateRenderTargetView(swapChainResources[index].Get(), &rtvDesc, rtvHandles[index]);
-				}
-				backBufferWidth = clientWidth;
-				backBufferHeight = clientHeight;
-				editorViewport.Width = static_cast<float>(clientWidth);
-				editorViewport.Height = static_cast<float>(clientHeight);
-				editorScissorRect.right = static_cast<LONG>(clientWidth);
-				editorScissorRect.bottom = static_cast<LONG>(clientHeight);
+			if (graphicsDevice->Resize(clientWidth, clientHeight)) {
+				// 作り直したときは、カメラの縦横比も新しい大きさに合わせる
 				camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
 			}
 
@@ -2506,8 +2475,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				0,
 				nullptr);
 			// ImGuiは固定1280x720ではなく、現在のBackBuffer全体へ描画する
-			commandList->RSSetViewports(1, &editorViewport);
-			commandList->RSSetScissorRects(1, &editorScissorRect);
+			commandList->RSSetViewports(1, &graphicsDevice->GetBackBufferViewport());
+			commandList->RSSetScissorRects(1, &graphicsDevice->GetBackBufferScissorRect());
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 #endif // USE_IMGUI
 			// TransitionBarrerを張る
