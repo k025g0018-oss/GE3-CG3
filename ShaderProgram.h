@@ -3,8 +3,12 @@
 #include "DxcCompiler.h"
 
 #include <d3d12.h>
+#include <dxcapi.h>
 #include <ostream>
 #include <wrl.h>
+
+// 前方宣言
+class DxcCompiler;
 
 ///// ----- ShaderProgram ----- /////
 
@@ -17,8 +21,8 @@ public:
 	ShaderProgram& operator=(const ShaderProgram&) = delete;
 
 	/// --- 初期化 ---
-	// VertexShaderとPixelShaderをコンパイル
-	void Initialize(std::ostream& logStream);
+	// 借りたDXCでVertexShaderとPixelShaderをコンパイル
+	void Initialize(DxcCompiler* dxcCompiler, std::ostream& logStream);
 
 	/// --- 取得 ---
 	// VertexShaderのByteCodeを取得
@@ -32,7 +36,6 @@ public:
 	void Finalize();
 
 private:
-	DxcCompiler dxcCompiler_;
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob_;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob_;
 };

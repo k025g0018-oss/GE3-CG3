@@ -9,16 +9,17 @@ ShaderProgram::~ShaderProgram() {
 }
 
 /// --- 初期化 ---
-// VertexShaderとPixelShaderをコンパイル
-void ShaderProgram::Initialize(std::ostream& logStream) {
-	// DXCを初期化
-	dxcCompiler_.Initialize();
+// 借りたDXCでVertexShaderとPixelShaderをコンパイル
+void ShaderProgram::Initialize(DxcCompiler* dxcCompiler, std::ostream& logStream) {
+
+	// NULL検出
+	assert(dxcCompiler);
 
 	// ShaderをCompileする
-	vertexShaderBlob_ = dxcCompiler_.CompileShader(L"Object3D.VS.hlsl", L"vs_6_0", logStream);
+	vertexShaderBlob_ = dxcCompiler->CompileShader(L"Object3D.VS.hlsl", L"vs_6_0", logStream);
 	assert(vertexShaderBlob_ != nullptr);
 
-	pixelShaderBlob_ = dxcCompiler_.CompileShader(L"Object3D.PS.hlsl", L"ps_6_0", logStream);
+	pixelShaderBlob_ = dxcCompiler->CompileShader(L"Object3D.PS.hlsl", L"ps_6_0", logStream);
 	assert(pixelShaderBlob_ != nullptr);
 }
 
@@ -36,6 +37,6 @@ D3D12_SHADER_BYTECODE ShaderProgram::GetPixelShaderByteCode() const {
 /// --- 終了処理 ---
 // Shaderで使用したリソースを解放
 void ShaderProgram::Finalize() {
+
 	// ShaderBlobはComPtrのデストラクタが自動解放する
-	dxcCompiler_.Finalize();
 }

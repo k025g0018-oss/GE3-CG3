@@ -902,11 +902,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 初期化 ---
 		// RootSignatureと各設定をまとめてPSOを作成する
 		PipelineState pipelineState;
-		pipelineState.Initialize(device, logStream);
+		pipelineState.Initialize(device, graphicsDevice->GetDxcCompiler(), logStream);
 
 		// NormalBlend(半透明)で描画するためのPSO
 		PipelineState normalBlendPipelineState;
-		normalBlendPipelineState.Initialize(device, logStream, BlendMode::kNormal);
+		normalBlendPipelineState.Initialize(device, graphicsDevice->GetDxcCompiler(), logStream, BlendMode::kNormal);
 
 		// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
 		ComPtr<ID3D12Resource> wvpResource;
@@ -1047,26 +1047,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 転送が終わったのでソースは解放する
 		// GPUへの転送が終わったので転送用リソースを解放する
 		textureManager.ReleaseIntermediateResources();
-
-		/// --- ViewportとScissor ---
-
-		// ビューポート
-		D3D12_VIEWPORT viewport{};
-		// クライアント領域のサイズと一緒にして画面全体に表示
-		viewport.Width = Window::kClientWidth;
-		viewport.Height = Window::kClientHeight;
-		viewport.TopLeftX = 0;
-		viewport.TopLeftY = 0;
-		viewport.MinDepth = 0.0f;
-		viewport.MaxDepth = 1.0f;
-
-		// シザー矩形
-		D3D12_RECT scissorRect{};
-		// ビューポートと同じ矩形が構成されるようにする
-		scissorRect.left = 0;
-		scissorRect.right = Window::kClientWidth;
-		scissorRect.top = 0;
-		scissorRect.bottom = Window::kClientHeight;
 
 		// ImGuiを描画するSwapChain側は、実際のウィンドウサイズへ追従させる
 		uint32_t backBufferWidth = Window::kClientWidth;

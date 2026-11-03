@@ -11,6 +11,9 @@
 #include <wrl.h>
 #include <ostream>
 
+// 前方宣言
+class DxcCompiler;
+
 ///// ----- PSO(Pipeline State Object) ----- /////
 
 class PipelineState {
@@ -23,12 +26,12 @@ public:
 
 	/// <summary>
 	/// 初期化
-	/// 描画に必要なPSOを作成
+	/// 指定したBlendModeで描画に必要なPSOを作成
 	/// </summary>
 	/// <param name="device"></param>
 	/// <param name="logStream"></param>
 	/// <param name="blendMode"></param>
-	void Initialize(ID3D12Device* device, std::ostream& logStream, BlendMode blendMode = BlendMode::kNone);
+	void Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream, BlendMode blendMode = BlendMode::kNone);
 
 	/// --- 取得 ---
 	// 作成したRootSignatureを取得

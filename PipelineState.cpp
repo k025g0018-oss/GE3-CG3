@@ -15,33 +15,40 @@ PipelineState::~PipelineState() {
 /// <param name="device"></param>
 /// <param name="logStream"></param>
 /// <param name="blendMode"></param>
-void PipelineState::Initialize(ID3D12Device* device, std::ostream& logStream, BlendMode blendMode) {
+void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream, BlendMode blendMode) {
 
 	/// --- RootSignature ---
+
 	// RootSignatureを作成
 	rootSignature_.Initialize(device, logStream);
 
 	/// --- InputLayout ---
+
 	// 頂点データの並びを設定
 	inputLayout_.Initialize();
 
 	/// --- BlendState ---
+
 	// 色の書き込み方法を設定
 	blendState_.Initialize(blendMode);
 
 	/// --- RasterizerState ---
+
 	// 面の判定と塗りつぶし方法を設定
 	rasterizerState_.Initialize();
 
 	/// --- ShaderProgram ---
-	// VertexShaderとPixelShaderをコンパイル
-	shaderProgram_.Initialize(logStream);
+
+	// 借りたDXCでVertexShaderとPixelShaderをコンパイル
+	shaderProgram_.Initialize(dxcCompiler, logStream);
 
 	/// --- DepthStencilState ---
+
 	// 奥行きの比較と書き込み方法を設定
 	depthStencilState_.Initialize();
 
 	/// --- GraphicsPipelineState ---
+
 	// PSOを生成する
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc{};
 	graphicsPipelineStateDesc.pRootSignature = rootSignature_.Get(); // RootSignature

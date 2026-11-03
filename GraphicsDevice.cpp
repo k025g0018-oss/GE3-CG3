@@ -44,12 +44,18 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 
 	// シザー矩形の初期化
 	InitializeScissorRect();
+
+	// DXCコンパイラの初期化
+	InitializeDxcCompiler();
 }
 
 /// <summary>
 /// 終了
 /// </summary>
 void GraphicsDevice::Finalize() {
+
+	// DXCコンパイラを解放する
+	dxcCompiler_.Finalize();
 
 	// 深度バッファを解放する
 	depthStencilView_.Finalize();
@@ -293,4 +299,12 @@ void GraphicsDevice::InitializeScissorRect() {
 	scissorRect_.right = Window::kClientWidth;
 	scissorRect_.top = 0;
 	scissorRect_.bottom = Window::kClientHeight;
+}
+
+/// <summary>
+/// DXCコンパイラの初期化
+/// </summary>
+void GraphicsDevice::InitializeDxcCompiler() {
+	// DxcUtils・DxcCompiler・IncludeHandlerを生成する
+	dxcCompiler_.Initialize();
 }

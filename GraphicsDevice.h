@@ -3,6 +3,7 @@
 #include "CommandContext.h"
 #include "DescriptorHeap.h"
 #include "DepthStencilView.h"
+#include "DxcCompiler.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -148,6 +149,13 @@ public:
 		return scissorRect_;
 	}
 
+	/// <summary>
+	/// シェーダーのコンパイラ (PSOを作るときに借りる)
+	/// </summary>
+	DxcCompiler* GetDxcCompiler() {
+		return &dxcCompiler_;
+	}
+
 	///// ----- ===== ----- /////
 
 private:
@@ -193,6 +201,11 @@ private:
 	/// シザー矩形の初期化
 	/// </summary>
 	void InitializeScissorRect();
+
+	/// <summary>
+	/// DXCコンパイラの初期化
+	/// </summary>
+	void InitializeDxcCompiler();
 
 	///// ----- ===== ----- /////
 
@@ -245,6 +258,9 @@ private:
 
 	// ゲーム画面用のシザー矩形 (ビューポートと同じ大きさ)
 	D3D12_RECT scissorRect_{};
+
+	// シェーダーのコンパイラ (1つをみんなで使う)
+	DxcCompiler dxcCompiler_;
 
 	///// ----- ===== ----- /////
 };
