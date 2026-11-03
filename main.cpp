@@ -882,7 +882,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// GraphicsDeviceが作った各種ディスクリプタヒープを借りる
 		DescriptorHeap& srvDescriptorHeap = graphicsDevice->GetSrvDescriptorHeap();
-		DescriptorHeap& dsvDescriptorHeap = graphicsDevice->GetDsvDescriptorHeap();
 
 		/// --- バックバッファ ---
 
@@ -1040,14 +1039,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		TextureManager textureManager;
 		textureManager.Initialize(device, commandList, srvDescriptorHeap);
 
-		///// ----- DSV(Depth Stencil View) ----- /////
-
-		/// --- 初期化 ---
-		// 深度ステンシルテクスチャリソースとDSVを作る
-		DepthStencilView depthStencilView;
-		depthStencilView.Initialize(device, dsvDescriptorHeap, Window::kClientWidth, Window::kClientHeight);
-
 		/// --- Texture転送コマンドの実行 ---
+
 		// コマンドを実行してGPUの完了を待つ
 		commandContext->ExecuteAndWait();
 
@@ -1056,6 +1049,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		textureManager.ReleaseIntermediateResources();
 
 		/// --- ViewportとScissor ---
+
 		// ビューポート
 		D3D12_VIEWPORT viewport{};
 		// クライアント領域のサイズと一緒にして画面全体に表示
@@ -1081,6 +1075,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		D3D12_RECT editorScissorRect = scissorRect;
 
 		///// ----- 変数の宣言 ----- /////
+
 		/// 三角形
 		// Transformの変数を作る
 		// 3Dオブジェクトの状態をObject3Dへ集約し、既存の描画処理から参照して使う
@@ -2337,7 +2332,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			commandList->ResourceBarrier(1, &barrier);
 
 			// 描画先のRTVとDSVを設定する
-			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = depthStencilView.GetHandle();
+			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = graphicsDevice->GetDsvHandle();
 			D3D12_CPU_DESCRIPTOR_HANDLE gameRenderTarget = rtvHandles[backBufferIndex];
 #ifdef USE_IMGUI
 			// エディター有効時はゲームをScene用テクスチャへ描画する
@@ -2575,7 +2570,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 読み込んだテクスチャをすべて解放する
 		textureManager.Finalize();
-		depthStencilView.Finalize();
 
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 		pipelineState.Finalize();

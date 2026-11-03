@@ -1,7 +1,8 @@
 #pragma once
 
 #include "CommandContext.h"
-#include "DescriptorHeap.h"														
+#include "DescriptorHeap.h"
+#include "DepthStencilView.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -126,6 +127,13 @@ public:
 		return rtvHandles_;
 	}
 
+	/// <summary>
+	/// 深度ステンシルビューのハンドル
+	/// </summary>
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDsvHandle() const {
+		return depthStencilView_.GetHandle();
+	}
+
 	///// ----- ===== ----- /////
 
 private:
@@ -156,6 +164,11 @@ private:
 	/// レンダーターゲットビューの生成
 	/// </summary>
 	void InitializeRenderTargetView();
+
+	/// <summary>
+	/// 深度バッファと深度ステンシルビューの生成
+	/// </summary>
+	void InitializeDepthStencilView();
 
 	///// ----- ===== ----- /////
 
@@ -199,6 +212,9 @@ private:
 
 	// バックバッファごとのRTVのハンドル
 	std::array<D3D12_CPU_DESCRIPTOR_HANDLE, kBackBufferCount> rtvHandles_{};
+
+	// 深度バッファと深度ステンシルビュー
+	DepthStencilView depthStencilView_;
 
 	///// ----- ===== ----- /////
 };

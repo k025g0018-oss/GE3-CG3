@@ -35,12 +35,18 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 
 	// レンダーターゲットビューの生成
 	InitializeRenderTargetView();
+
+	// 深度バッファと深度ステンシルビューの生成
+	InitializeDepthStencilView();
 }
 
 /// <summary>
 /// 終了
 /// </summary>
 void GraphicsDevice::Finalize() {
+
+	// 深度バッファを解放する
+	depthStencilView_.Finalize();
 
 	// 各種ディスクリプタヒープを解放する
 	rtvDescriptorHeap_.Finalize();
@@ -112,7 +118,7 @@ void GraphicsDevice::InitializeDevice(std::ostream& logStream) {
 	assert(useAdapter != nullptr);
 
 	// --- D3D12Deviceの生成 ---
-	// 
+
 	// 機能レベルとログ出力用の文字列
 	D3D_FEATURE_LEVEL featureLevels[]{
 		D3D_FEATURE_LEVEL_12_2, D3D_FEATURE_LEVEL_12_1, D3D_FEATURE_LEVEL_12_0};
@@ -175,6 +181,7 @@ void GraphicsDevice::InitializeDevice(std::ostream& logStream) {
 /// コマンド関連の初期化
 /// </summary>
 void GraphicsDevice::InitializeCommand() {
+
 	// CommandQueue・CommandAllocator・CommandList・Fenceを生成する
 	commandContext_.Initialize(device_.Get());
 }
@@ -245,4 +252,13 @@ void GraphicsDevice::InitializeRenderTargetView() {
 		// その場所に、バックバッファのRTVを作る
 		device_->CreateRenderTargetView(swapChainResources_[index].Get(), &rtvDesc_, rtvHandles_[index]);
 	}
+}
+
+/// <summary>
+/// 深度バッファと深度ステンシルビューの生成
+/// </summary>
+void GraphicsDevice::InitializeDepthStencilView() {
+
+	// クライアント領域と同じ大きさの深度バッファを作り、DSV用ヒープにDSVを作る
+	depthStencilView_.Initialize(device_.Get(), dsvDescriptorHeap_, Window::kClientWidth, Window::kClientHeight);
 }
