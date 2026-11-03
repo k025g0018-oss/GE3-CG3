@@ -2,6 +2,7 @@
 
 #include "BufferResource.h"
 #include "Logger.h"
+#include "StringUtility.h"
 
 #include "externals/DirectXTex/d3dx12.h"
 
@@ -95,7 +96,7 @@ uint32_t TextureManager::FindTextureIndex(
 DirectX::ScratchImage TextureManager::LoadTexture(const std::string& filePath) {
 	// テクスチャファイルを読んでプログラムで扱えるようにする
 	DirectX::ScratchImage image{};
-	std::wstring filePathW = ConvertString(filePath);
+	std::wstring filePathW = StringUtility::ConvertString(filePath);
 	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
 	assert(SUCCEEDED(hr));
 

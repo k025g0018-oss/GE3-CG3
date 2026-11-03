@@ -1,6 +1,7 @@
 #include "GraphicsDevice.h"
 #include "Window.h"
 #include "Logger.h"
+#include "StringUtility.h"
 
 #include <cassert>
 #include <format>
@@ -139,9 +140,9 @@ void GraphicsDevice::InitializeDevice(std::ostream& logStream) {
 		// ソフトウェアアダプタでなければ採用
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE)) {
 			// 採用したアダプタの情報をログに出力。wstringの方なので注意
-			Log(logStream, std::format(L"Use Adapter:{}\n", adapterDesc.Description));
+			Logger::Log(logStream, std::format(L"Use Adapter:{}\n", adapterDesc.Description));
 			// 画面に表示するため、GPUの名前をUTF-8の文字列にして記録する
-			adapterName_ = ConvertString(adapterDesc.Description);
+			adapterName_ = StringUtility::ConvertString(adapterDesc.Description);
 
 			break;
 		}
@@ -167,14 +168,14 @@ void GraphicsDevice::InitializeDevice(std::ostream& logStream) {
 		// 指定した機能レベルでデバイスが生成できたかを確認
 		if (SUCCEEDED(hr)) {
 			// 生成できたのでログ出力を行ってループを抜ける
-			Log(logStream, std::format("FeatureLevel : {}\n", featureLevelStrings[i]));
+			Logger::Log(logStream, std::format("FeatureLevel : {}\n", featureLevelStrings[i]));
 			break; // 生成できたらループを抜ける
 		}
 	}
 
 	// デバイスの生成がうまくいかなかったので起動できない
 	assert(device_ != nullptr);
-	Log(logStream, "Complete create D3D12Device!!!\n"); // 初期化完了のログを出す
+	Logger::Log(logStream, "Complete create D3D12Device!!!\n"); // 初期化完了のログを出す
 
 	// エラー・警告を実行時にプログラムを停止させる、deviceに対して行う
 #ifdef _DEBUG

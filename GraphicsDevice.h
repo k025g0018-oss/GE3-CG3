@@ -109,13 +109,6 @@ public:
 	}
 
 	/// <summary>
-	/// スワップチェーンの設定
-	/// </summary>
-	const DXGI_SWAP_CHAIN_DESC1& GetSwapChainDesc() const {
-		return swapChainDesc_;
-	}
-
-	/// <summary>
 	/// バックバッファ
 	/// </summary>
 	const std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kBackBufferCount>& GetSwapChainResources() const {
@@ -127,13 +120,6 @@ public:
 	/// </summary>
 	DescriptorHeap& GetSrvDescriptorHeap() {
 		return srvDescriptorHeap_;
-	}
-
-	/// <summary>
-	/// DSV用ディスクリプタヒープ
-	/// </summary>
-	DescriptorHeap& GetDsvDescriptorHeap() {
-		return dsvDescriptorHeap_;
 	}
 
 	/// <summary>
@@ -190,6 +176,20 @@ public:
 	/// </summary>
 	const D3D12_RECT& GetBackBufferScissorRect() const {
 		return backBufferScissorRect_;
+	}
+
+	/// <summary>
+	/// SRVの指定番号のCPUデスクリプタハンドルを取得する
+	/// </summary>
+	D3D12_CPU_DESCRIPTOR_HANDLE GetSrvCpuHandle(uint32_t index) const {
+		return srvDescriptorHeap_.GetCPUHandle(index);
+	}
+
+	/// <summary>
+	/// SRVの指定番号のGPUデスクリプタハンドルを取得する
+	/// </summary>
+	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvGpuHandle(uint32_t index) const {
+		return srvDescriptorHeap_.GetGPUHandle(index);
 	}
 
 	///// ----- ===== ----- /////

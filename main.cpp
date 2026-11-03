@@ -817,7 +817,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ファイルを作って書き込み準備
 		std::ofstream logStream(logFilePath);
 
-		Log(logStream, "ぶっ飛ばすぜべいべ");
+		Logger::Log(logStream, "ぶっ飛ばすぜべいべ");
 
 		// 出力ウィンドウへの文字出力
 		OutputDebugStringA("Hello,DirectX!\n");

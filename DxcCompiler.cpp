@@ -1,6 +1,7 @@
 #include "DxcCompiler.h"
 
 #include "Logger.h"
+#include "StringUtility.h"
 
 #include <cassert>
 #include <format>
@@ -30,7 +31,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> DxcCompiler::CompileShader(const std::wstring& 
 	/// --- HLSLファイルの読み込み ---
 	// 1_HLSLファイルを読む
 	// シェーダーをコンパイルする旨をログに出す
-	Log(logStream, ConvertString(std::format(L"Begin CompileShader, path:{}, profile:{}\n", filePath, profile)));
+	Logger::Log(logStream, StringUtility::ConvertString(std::format(L"Begin CompileShader, path:{}, profile:{}\n", filePath, profile)));
 	// hlslファイルを読む
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource;
 	HRESULT hr = dxcUtils_->LoadFile(filePath.c_str(), nullptr, shaderSource.GetAddressOf());
@@ -72,7 +73,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> DxcCompiler::CompileShader(const std::wstring& 
 	Microsoft::WRL::ComPtr<IDxcBlobUtf8> shaderError;
 	shaderResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(shaderError.GetAddressOf()), nullptr);
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0) {
-		Log(logStream, shaderError->GetStringPointer());
+		Logger::Log(logStream, shaderError->GetStringPointer());
 		// 警告・エラー
 		assert(false);
 	}
@@ -84,7 +85,7 @@ Microsoft::WRL::ComPtr<IDxcBlob> DxcCompiler::CompileShader(const std::wstring& 
 	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(shaderBlob.GetAddressOf()), nullptr);
 	assert(SUCCEEDED(hr));
 	// 成功したログを出す
-	Log(logStream, ConvertString(std::format(L"Compile Succeeded, path:{}, profile:{}\n", filePath, profile)));
+	Logger::Log(logStream, StringUtility::ConvertString(std::format(L"Compile Succeeded, path:{}, profile:{}\n", filePath, profile)));
 	// もう使わないリソースを開放
 	// 一時COMオブジェクトはComPtrが自動解放する
 	// 実行用のバイナリを返却

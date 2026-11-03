@@ -72,7 +72,7 @@ void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream) {
 	);
 	if (FAILED(hr)) {
 		if (errorBlob_ != nullptr) {
-			Log(logStream, reinterpret_cast<char*>(errorBlob_->GetBufferPointer()));
+			Logger::Log(logStream, reinterpret_cast<char*>(errorBlob_->GetBufferPointer()));
 		}
 		assert(false);
 	}

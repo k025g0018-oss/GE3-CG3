@@ -200,6 +200,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="ShaderResourceView.cpp" />
     <ClCompile Include="Sphere.cpp" />
     <ClCompile Include="Sprite.cpp" />
+    <ClCompile Include="StringUtility.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Vector.cpp" />
     <ClCompile Include="VertexBuffer.cpp" />
@@ -266,6 +267,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="ShaderResourceView.h" />
     <ClInclude Include="Sphere.h" />
     <ClInclude Include="Sprite.h" />
+    <ClInclude Include="StringUtility.h" />
     <ClInclude Include="TextureManager.h" />
     <ClInclude Include="TransformationMatrix.h" />
     <ClInclude Include="Vector.h" />
