@@ -27,7 +27,14 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 	// コマンド関連の初期化
 	InitializeCommand();
 
+	// デバイスの初期化 (ID3D12Device)
+	InitializeDevice(logStream);
 
+	// コマンド関連の初期化
+	InitializeCommand();
+
+	// スワップチェーンの生成
+	InitializeSwapChain();
 }
 
 /// <summary>
@@ -165,4 +172,39 @@ void GraphicsDevice::InitializeDevice(std::ostream& logStream) {
 void GraphicsDevice::InitializeCommand() {
 	// CommandQueue・CommandAllocator・CommandList・Fenceを生成する
 	commandContext_.Initialize(device_.Get());
+}
+
+/// <summary>
+/// スワップチェーンの生成とバックバッファの取得
+/// </summary>
+void GraphicsDevice::InitializeSwapChain() {
+
+	HRESULT hr;
+
+	/// --- SwapChainの生成 ---
+
+	swapChainDesc_.Width = Window::kClientWidth;					 // 画面の幅。ウィンドウのクライアント領域を同じものにしておく。
+	swapChainDesc_.Height = Window::kClientHeight;					 // 画面の高さ。ウィンドウのクライアント領域を同じものにしておく。
+	swapChainDesc_.Format = DXGI_FORMAT_R8G8B8A8_UNORM;				 // 色の形式
+	swapChainDesc_.SampleDesc.Count = 1;							 // マルチサンプルしない
+	swapChainDesc_.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;	 // 描画のターゲットとして利用する
+	swapChainDesc_.BufferCount = kBackBufferCount;					 // ダブルバッファ
+	swapChainDesc_.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;		 // モニターにうつしたら、中身を廃棄
+
+	// コマンドキュー、ウィンドウハンドル、設定を渡して生成する。
+	hr = dxgiFactory_->CreateSwapChainForHwnd(
+		commandContext_.GetCommandQueue(),
+		window_->GetHwnd(),
+		&swapChainDesc_,
+		nullptr,
+		nullptr,
+		reinterpret_cast<IDXGISwapChain1**>(swapChain_.GetAddressOf()));
+	assert(SUCCEEDED(hr));
+
+	/// --- SwapChainからResourceを引っ張ってくる ---
+
+	for (UINT index = 0; index < kBackBufferCount; ++index) {
+		hr = swapChain_->GetBuffer(index, IID_PPV_ARGS(swapChainResources_[index].GetAddressOf()));
+		assert(SUCCEEDED(hr));
+	}
 }

@@ -7,6 +7,7 @@
 #include <wrl.h>
 #include <ostream>
 #include <string>
+#include <array>
 
 // ポインタしか使わないので前方宣言
 class Window;
@@ -27,6 +28,13 @@ public:
 	/// 終了
 	/// </summary>
 	void Finalize();
+
+	///// ----- ===== ----- /////
+
+	///// ----- 定数 ----- /////
+
+	// バックバッファの枚数 (ダブルバッファ)
+	static const UINT kBackBufferCount = 2;
 
 	///// ----- ===== ----- /////
 
@@ -72,6 +80,27 @@ public:
 		return commandContext_.GetCommandList();
 	}
 
+	/// <summary>
+	/// スワップチェーン
+	/// </summary>
+	IDXGISwapChain4* GetSwapChain() const {
+		return swapChain_.Get();
+	}
+
+	/// <summary>
+	/// スワップチェーンの設定
+	/// </summary>
+	const DXGI_SWAP_CHAIN_DESC1& GetSwapChainDesc() const {
+		return swapChainDesc_;
+	}
+
+	/// <summary>
+	/// バックバッファ (リサイズで作り直すので書き換えられる参照で返す)
+	/// </summary>
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kBackBufferCount>& GetSwapChainResources() {
+		return swapChainResources_;
+	}
+
 	///// ----- ===== ----- /////
 
 private:
@@ -87,6 +116,11 @@ private:
 	/// コマンド関連の初期化 (CommandQueue Allocator List Fence)
 	/// </summary>
 	void InitializeCommand();
+
+	/// <summary>
+	/// スワップチェーンの生成とバックバッファの取得
+	/// </summary>
+	void InitializeSwapChain();
 
 	///// ----- ===== ----- /////
 
@@ -106,6 +140,15 @@ private:
 
 	// コマンドの記録と実行を管理 (Fenceも含む)
 	CommandContext commandContext_;
+
+	// スワップチェーン
+	Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain_;
+
+	// スワップチェーンの設定 (リサイズやImGuiの初期化でも使う)
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc_{};
+
+	// バックバッファ (スワップチェーンのリソース)
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, kBackBufferCount> swapChainResources_;
 
 	///// ----- ===== ----- /////
 };

@@ -47,6 +47,7 @@
 #include <vector> // ImGuiが使用するSRV番号を管理するため
 #include <cmath>
 #include <cstring>
+#include <array>
 
 // COMオブジェクトを自動解放するためにComPtrを使用する
 using Microsoft::WRL::ComPtr;
@@ -790,8 +791,6 @@ struct D3DResourceLeakChecker {
 
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
-	// DirectXの各関数の結果を受け取る
-	HRESULT hr;
 
 	{
 		// 最初に生成し、ほかのローカル変数より最後にデストラクタを呼ぶ
@@ -865,9 +864,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// GraphicsDeviceが作ったデバイスを借りる
 		ID3D12Device* device = graphicsDevice->GetDevice();
 
-		// スワップチェーンの生成で使うDXGiファクトリーを借りる (スワップチェーンを移したら消す)
-		IDXGIFactory7* dxgiFactory = graphicsDevice->GetDxgiFactory();
-
 		/// --- CommandContext ---
 
 		// GraphicsDeviceが持つコマンド管理を借りる
@@ -876,24 +872,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		ID3D12GraphicsCommandList* commandList = graphicsDevice->GetCommandList();
 
 		/// --- SwapChainの生成 ---
-		ComPtr<IDXGISwapChain4> swapChain;
-		DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-		swapChainDesc.Width = Window::kClientWidth;							 // 画面の幅。ウィンドウのクライアント領域を同じものにしておく。
-		swapChainDesc.Height = Window::kClientHeight;						 // 画面の高さ。ウィンドウのクライアント領域を同じものにしておく。
-		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;			 // 色の形式
-		swapChainDesc.SampleDesc.Count = 1;							 // マルチサンプルしない
-		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; // 描画のターゲットとして利用する
-		swapChainDesc.BufferCount = 2;								 // ダブルバッファ
-		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;	 // モニターにうつしたら、中身を廃棄
-		// コマンドキュー、ウィンドウハンドル、設定を渡して生成する。
-		hr = dxgiFactory->CreateSwapChainForHwnd(
-			commandContext->GetCommandQueue(),
-			window->GetHwnd(),
-			&swapChainDesc,
-			nullptr,
-			nullptr,
-			reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
-		assert(SUCCEEDED(hr));
+
+		// GraphicsDeviceが作ったスワップチェーンを借りる
+		IDXGISwapChain4* swapChain = graphicsDevice->GetSwapChain();
+		// スワップチェーンの設定を借りる (ImGuiの初期化とリサイズで使う)
+		const DXGI_SWAP_CHAIN_DESC1& swapChainDesc = graphicsDevice->GetSwapChainDesc();
 
 		/// --- DescriptorHeapの生成 ---
 		// RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
@@ -908,12 +891,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		DescriptorHeap dsvDescriptorHeap;
 		dsvDescriptorHeap.Initialize(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 
-		/// --- SwapChainからResourceを引っ張ってくる ---
-		ComPtr<ID3D12Resource> swapChainResources[2];
-		hr = swapChain->GetBuffer(0, IID_PPV_ARGS(swapChainResources[0].GetAddressOf()));
-		assert(SUCCEEDED(hr));
-		hr = swapChain->GetBuffer(1, IID_PPV_ARGS(swapChainResources[1].GetAddressOf()));
-		assert(SUCCEEDED(hr));
+		/// --- バックバッファ ---
+
+		// GraphicsDeviceが取得したバックバッファを借りる (リサイズで作り直すので参照で受け取る)
+		std::array<ComPtr<ID3D12Resource>, GraphicsDevice::kBackBufferCount>& swapChainResources =
+			graphicsDevice->GetSwapChainResources();
 
 		// --- RTVを作る ---
 		// RTVの設定
@@ -2575,7 +2557,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			/// --- コマンドの実行 ---
 			// コマンドを実行して画面を表示する
-			commandContext->ExecuteAndPresent(swapChain.Get());
+			commandContext->ExecuteAndPresent(swapChain);
 #pragma endregion コマンドを積む処理
 
 		} // whileの終わり
