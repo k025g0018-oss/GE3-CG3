@@ -38,6 +38,12 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 
 	// 深度バッファと深度ステンシルビューの生成
 	InitializeDepthStencilView();
+
+	// ビューポートの初期化
+	InitializeViewport();
+
+	// シザー矩形の初期化
+	InitializeScissorRect();
 }
 
 /// <summary>
@@ -261,4 +267,30 @@ void GraphicsDevice::InitializeDepthStencilView() {
 
 	// クライアント領域と同じ大きさの深度バッファを作り、DSV用ヒープにDSVを作る
 	depthStencilView_.Initialize(device_.Get(), dsvDescriptorHeap_, Window::kClientWidth, Window::kClientHeight);
+}
+
+/// <summary>
+/// ビューポートの初期化
+/// </summary>
+void GraphicsDevice::InitializeViewport() {
+
+	// クライアント領域のサイズと一緒にして画面全体に表示
+	viewport_.Width = static_cast<float>(Window::kClientWidth);
+	viewport_.Height = static_cast<float>(Window::kClientHeight);
+	viewport_.TopLeftX = 0.0f;
+	viewport_.TopLeftY = 0.0f;
+	viewport_.MinDepth = 0.0f;
+	viewport_.MaxDepth = 1.0f;
+}
+
+/// <summary>
+/// シザー矩形の初期化
+/// </summary>
+void GraphicsDevice::InitializeScissorRect() {
+
+	// ビューポートと同じ矩形が構成されるようにする
+	scissorRect_.left = 0;
+	scissorRect_.right = Window::kClientWidth;
+	scissorRect_.top = 0;
+	scissorRect_.bottom = Window::kClientHeight;
 }

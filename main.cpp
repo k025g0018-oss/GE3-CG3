@@ -1071,8 +1071,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ImGuiを描画するSwapChain側は、実際のウィンドウサイズへ追従させる
 		uint32_t backBufferWidth = Window::kClientWidth;
 		uint32_t backBufferHeight = Window::kClientHeight;
-		D3D12_VIEWPORT editorViewport = viewport;
-		D3D12_RECT editorScissorRect = scissorRect;
+		// ゲーム画面用をコピーして、リサイズに合わせて書き換える
+		D3D12_VIEWPORT editorViewport = graphicsDevice->GetViewport();
+		D3D12_RECT editorScissorRect = graphicsDevice->GetScissorRect();
 
 		///// ----- 変数の宣言 ----- /////
 
@@ -2351,8 +2352,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 描画の設定(ドローコール)
 			// ViewportとScissorRectの設定
-			commandList->RSSetViewports(1, &viewport);
-			commandList->RSSetScissorRects(1, &scissorRect);
+			commandList->RSSetViewports(1, &graphicsDevice->GetViewport());
+			commandList->RSSetScissorRects(1, &graphicsDevice->GetScissorRect());
 			// RootSignatureの設定
 			commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
 			// PSOの設定

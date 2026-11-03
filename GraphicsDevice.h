@@ -134,6 +134,20 @@ public:
 		return depthStencilView_.GetHandle();
 	}
 
+	/// <summary>
+	/// ゲーム画面用のビューポート
+	/// </summary>
+	const D3D12_VIEWPORT& GetViewport() const {
+		return viewport_;
+	}
+
+	/// <summary>
+	/// ゲーム画面用のシザー矩形
+	/// </summary>
+	const D3D12_RECT& GetScissorRect() const {
+		return scissorRect_;
+	}
+
 	///// ----- ===== ----- /////
 
 private:
@@ -169,6 +183,16 @@ private:
 	/// 深度バッファと深度ステンシルビューの生成
 	/// </summary>
 	void InitializeDepthStencilView();
+
+	/// <summary>
+	/// ビューポートの初期化
+	/// </summary>
+	void InitializeViewport();
+
+	/// <summary>
+	/// シザー矩形の初期化
+	/// </summary>
+	void InitializeScissorRect();
 
 	///// ----- ===== ----- /////
 
@@ -215,6 +239,12 @@ private:
 
 	// 深度バッファと深度ステンシルビュー
 	DepthStencilView depthStencilView_;
+
+	// ゲーム画面用のビューポート (クライアント領域と同じ大きさ)
+	D3D12_VIEWPORT viewport_{};
+
+	// ゲーム画面用のシザー矩形 (ビューポートと同じ大きさ)
+	D3D12_RECT scissorRect_{};
 
 	///// ----- ===== ----- /////
 };
