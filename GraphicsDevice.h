@@ -12,6 +12,8 @@
 #include <ostream>
 #include <string>
 #include <array>
+#include <vector>
+#include <cassert>
 
 /// <summary>
 /// DirectX基盤
@@ -36,6 +38,20 @@ public:
 	/// <returns>作り直したらtrue (大きさが同じなら何もしないでfalse)</returns>
 	bool Resize(uint32_t width, uint32_t height);
 
+#ifdef USE_IMGUI
+
+	/// <summary>
+	/// ImGuiのフレーム開始 (毎フレームの最初に呼ぶ)
+	/// </summary>
+	void BeginImGuiFrame();
+
+	/// <summary>
+	/// ImGuiの描画コマンドを積む
+	/// </summary>
+	void DrawImGui();
+
+#endif // USE_IMGUI
+
 	///// ----- ===== ----- /////
 
 	///// ----- 定数 ----- /////
@@ -45,6 +61,9 @@ public:
 
 	// SRV用ディスクリプタヒープに確保する数 (テクスチャとImGuiで使う)
 	static const UINT kSrvDescriptorCount = 128;
+
+	// ImGuiに割り当てるSRVの開始番号 (ゲーム用SRVと重ならない64番以降)
+	static const UINT kImGuiSrvStartIndex = 64;
 
 	///// ----- ===== ----- /////
 
@@ -176,6 +195,49 @@ public:
 	///// ----- ===== ----- /////
 
 private:
+#ifdef USE_IMGUI
+
+	///// ----- ImGui用SRVの割り当て ----- /////
+
+	// Dear ImGui 1.92以降が必要とするSRVの確保と解放を管理する
+	struct ImGuiSrvDescriptorAllocator {
+		const DescriptorHeap* descriptorHeap = nullptr;
+		std::vector<uint32_t> freeIndices;
+
+		// ゲーム用SRVと衝突しないようにヒープ後半をImGui専用にする
+		void Initialize(const DescriptorHeap& heap, uint32_t firstIndex) {
+
+			descriptorHeap = &heap;
+			// 使える番号を、後ろから順に空きリストへ入れておく
+			for (uint32_t index = heap.GetDescriptorCount(); index > firstIndex; --index) {
+				freeIndices.push_back(index - 1);
+			}
+		}
+
+		// 空いている番号を1つ取り出して、その場所のハンドルを返す
+		void Allocate(D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle) {
+			assert(!freeIndices.empty());
+			const uint32_t index = freeIndices.back();
+			freeIndices.pop_back();
+			*cpuHandle = descriptorHeap->GetCPUHandle(index);
+			*gpuHandle = descriptorHeap->GetGPUHandle(index);
+		}
+
+		// 使い終わったハンドルから番号を計算して、空きリストへ戻す
+		void Free(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) {
+			const SIZE_T cpuOffset = cpuHandle.ptr - descriptorHeap->GetCPUHandleStart().ptr;
+			const UINT64 gpuOffset = gpuHandle.ptr - descriptorHeap->GetGPUHandleStart().ptr;
+			const uint32_t cpuIndex = static_cast<uint32_t>(cpuOffset / descriptorHeap->GetDescriptorSize());
+			const uint32_t gpuIndex = static_cast<uint32_t>(gpuOffset / descriptorHeap->GetDescriptorSize());
+			assert(cpuIndex == gpuIndex);
+			freeIndices.push_back(cpuIndex);
+		}
+	};
+
+	///// ----- ===== ----- /////
+
+#endif // USE_IMGUI
+
 	///// ----- メンバ関数 ----- /////
 
 	/// <summary>
@@ -223,6 +285,20 @@ private:
 	/// DXCコンパイラの初期化
 	/// </summary>
 	void InitializeDxcCompiler();
+
+#ifdef USE_IMGUI
+
+	/// <summary>
+	/// ImGuiの初期化
+	/// </summary>
+	void InitializeImGui();
+
+	/// <summary>
+	/// ImGuiの終了
+	/// </summary>
+	void FinalizeImGui();
+
+#endif // USE_IMGUI
 
 	///// ----- ===== ----- /////
 
@@ -288,6 +364,13 @@ private:
 
 	// バックバッファ全体のシザー矩形 (ウィンドウの大きさに追従する)
 	D3D12_RECT backBufferScissorRect_{};
+
+#ifdef USE_IMGUI
+
+	// ImGuiに渡すSRVの割り当て係 (ImGuiが使っている間は消えてはいけない)
+	ImGuiSrvDescriptorAllocator imguiSrvAllocator_;
+
+#endif // USE_IMGUI
 
 	///// ----- ===== ----- /////
 };

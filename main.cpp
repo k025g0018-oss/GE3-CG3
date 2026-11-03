@@ -99,40 +99,10 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 }
 
 ///// ----- ImGuiパネル ----- /////
+
 #ifdef USE_IMGUI
 // Hierarchyで現在選択されている項目を表す
 // Hierarchyの選択は共通ラッパーのポインターで管理する
-
-// Dear ImGui 1.92以降が必要とするSRVの確保と解放を管理する
-struct ImGuiSrvDescriptorAllocator {
-	const DescriptorHeap* descriptorHeap = nullptr;
-	std::vector<uint32_t> freeIndices;
-
-	// ゲーム用SRV(1～4番)と衝突しないようにヒープ後半をImGui専用にする
-	void Initialize(const DescriptorHeap& heap, uint32_t firstIndex) {
-		descriptorHeap = &heap;
-		for (uint32_t index = heap.GetDescriptorCount(); index > firstIndex; --index) {
-			freeIndices.push_back(index - 1);
-		}
-	}
-
-	void Allocate(D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle) {
-		assert(!freeIndices.empty());
-		const uint32_t index = freeIndices.back();
-		freeIndices.pop_back();
-		*cpuHandle = descriptorHeap->GetCPUHandle(index);
-		*gpuHandle = descriptorHeap->GetGPUHandle(index);
-	}
-
-	void Free(D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle) {
-		const SIZE_T cpuOffset = cpuHandle.ptr - descriptorHeap->GetCPUHandleStart().ptr;
-		const UINT64 gpuOffset = gpuHandle.ptr - descriptorHeap->GetGPUHandleStart().ptr;
-		const uint32_t cpuIndex = static_cast<uint32_t>(cpuOffset / descriptorHeap->GetDescriptorSize());
-		const uint32_t gpuIndex = static_cast<uint32_t>(gpuOffset / descriptorHeap->GetDescriptorSize());
-		assert(cpuIndex == gpuIndex);
-		freeIndices.push_back(cpuIndex);
-	}
-};
 
 // 起動時にViewportの比率からDock配置を作り、ウィンドウサイズ変更にも追従させる
 void SetupDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& viewportSize) {
@@ -875,8 +845,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// GraphicsDeviceが作ったスワップチェーンを借りる
 		IDXGISwapChain4* swapChain = graphicsDevice->GetSwapChain();
-		// スワップチェーンの設定を借りる (ImGuiの初期化とリサイズで使う)
-		const DXGI_SWAP_CHAIN_DESC1& swapChainDesc = graphicsDevice->GetSwapChainDesc();
 
 		/// --- DescriptorHeap ---
 
@@ -1311,53 +1279,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			Window::kClientHeight,
 			rtvDesc.Format);
 
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
-
+		// ImGuiの初期化はGraphicsDeviceで済んでいるので、入力の情報だけ受け取る
 		ImGuiIO& io = ImGui::GetIO();
 
-		// Docking対応版へ更新した後に有効化する
-		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-		ImGui::StyleColorsDark();
-		ImGui_ImplWin32_Init(window->GetHwnd());
-
-		// Dear ImGuiのDirectX 12初期化情報をまとめる
-		ImGui_ImplDX12_InitInfo initInfo{};
-		initInfo.Device = device;
-		initInfo.CommandQueue = commandContext->GetCommandQueue();
-		initInfo.NumFramesInFlight = swapChainDesc.BufferCount;
-		initInfo.RTVFormat = rtvDesc.Format;
-		initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
-		initInfo.SrvDescriptorHeap = srvDescriptorHeap.Get();
-
-		// Dear ImGuiにはゲーム用SRVと重ならない64番以降を割り当てる
-		ImGuiSrvDescriptorAllocator imguiSrvAllocator;
-		imguiSrvAllocator.Initialize(srvDescriptorHeap, 64);
-		initInfo.UserData = &imguiSrvAllocator;
-		initInfo.SrvDescriptorAllocFn = [](
-			ImGui_ImplDX12_InitInfo* info,
-			D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle,
-			D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle
-			) {
-				auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
-				allocator->Allocate(cpuHandle, gpuHandle);
-			};
-		initInfo.SrvDescriptorFreeFn = [](
-			ImGui_ImplDX12_InitInfo* info,
-			D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
-			D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle
-			) {
-				auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
-				allocator->Free(cpuHandle, gpuHandle);
-			};
-
-		// 新しいDirectX 12バックエンド初期化形式を使用する
-		ImGui_ImplDX12_Init(&initInfo);
-
-		io.Fonts->Build();
-
-		/// --- ヒエラルキーだお ---
+		/// --- ヒエラルキー ---
 
 		// ゲームクラスをImGuiへ直接依存させず、Editor用ラッパーを介して表示する
 		Primitive3DEditorObject primitive3DEditor(
@@ -1478,10 +1403,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #endif // USE_IMGUI
 
 			///// ----- ImGui先頭 ----- /////
+
 #ifdef USE_IMGUI
-			ImGui_ImplDX12_NewFrame();
-			ImGui_ImplWin32_NewFrame();
-			ImGui::NewFrame();
+
+			// ImGuiのフレームを開始する
+			graphicsDevice->BeginImGuiFrame();
 
 			// メインViewport全体をDock領域にして、最大化やサイズ変更へ追従させる
 			const ImGuiViewport* mainViewport = ImGui::GetMainViewport();
@@ -2477,8 +2403,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// ImGuiは固定1280x720ではなく、現在のBackBuffer全体へ描画する
 			commandList->RSSetViewports(1, &graphicsDevice->GetBackBufferViewport());
 			commandList->RSSetScissorRects(1, &graphicsDevice->GetBackBufferScissorRect());
-			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
+			// ImGuiの描画コマンドを積む
+			graphicsDevice->DrawImGui();
+
 #endif // USE_IMGUI
+
 			// TransitionBarrerを張る
 			commandList->ResourceBarrier(1, &barrier);
 
@@ -2493,10 +2422,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		/// --- ImGui終了処理 ---
 #ifdef USE_IMGUI
-		ImGui_ImplDX12_Shutdown();
-		ImGui_ImplWin32_Shutdown();
-		ImGui::DestroyContext();
+	
 		sceneRenderTexture.Finalize();
+
 #endif // USE_IMGUI
 
 		///// ----- 解放処理 ----- /////

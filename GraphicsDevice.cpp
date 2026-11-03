@@ -8,6 +8,14 @@
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 
+#ifdef USE_IMGUI
+
+#include "externals/imgui/imgui.h"
+#include "externals/imgui/imgui_impl_dx12.h"
+#include "externals/imgui/imgui_impl_win32.h"
+
+#endif // USE_IMGUI
+
 using Microsoft::WRL::ComPtr;
 
 /// <summary>
@@ -47,12 +55,26 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 
 	// DXCコンパイラの初期化
 	InitializeDxcCompiler();
+
+#ifdef USE_IMGUI
+
+	// ImGuiの初期化
+	InitializeImGui();
+
+#endif // USE_IMGUI
 }
 
 /// <summary>
 /// 終了
 /// </summary>
 void GraphicsDevice::Finalize() {
+
+#ifdef USE_IMGUI
+
+	// ImGuiを終了する
+	FinalizeImGui();
+
+#endif // USE_IMGUI
 
 	// DXCコンパイラを解放する
 	dxcCompiler_.Finalize();
@@ -362,3 +384,83 @@ bool GraphicsDevice::Resize(uint32_t width, uint32_t height) {
 
 	return true;
 }
+
+#ifdef USE_IMGUI
+
+/// <summary>
+/// ImGuiの初期化
+/// </summary>
+void GraphicsDevice::InitializeImGui() {
+
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+
+	ImGuiIO& io = ImGui::GetIO();
+
+	// Docking対応版へ更新した後に有効化する
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(window_->GetHwnd());
+
+	// Dear ImGuiのDirectX 12初期化情報をまとめる
+	ImGui_ImplDX12_InitInfo initInfo{};
+	initInfo.Device = device_.Get();
+	initInfo.CommandQueue = commandContext_.GetCommandQueue();
+	initInfo.NumFramesInFlight = swapChainDesc_.BufferCount;
+	initInfo.RTVFormat = rtvDesc_.Format;
+	initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	initInfo.SrvDescriptorHeap = srvDescriptorHeap_.Get();
+
+	// Dear ImGuiにはゲーム用SRVと重ならない番号以降を割り当てる
+	imguiSrvAllocator_.Initialize(srvDescriptorHeap_, kImGuiSrvStartIndex);
+	initInfo.UserData = &imguiSrvAllocator_;
+	initInfo.SrvDescriptorAllocFn = [](
+		ImGui_ImplDX12_InitInfo* info,
+		D3D12_CPU_DESCRIPTOR_HANDLE* cpuHandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE* gpuHandle
+		) {
+			auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
+			allocator->Allocate(cpuHandle, gpuHandle);
+		};
+	initInfo.SrvDescriptorFreeFn = [](
+		ImGui_ImplDX12_InitInfo* info,
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle,
+		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle
+		) {
+			auto* allocator = static_cast<ImGuiSrvDescriptorAllocator*>(info->UserData);
+			allocator->Free(cpuHandle, gpuHandle);
+		};
+
+	// 新しいDirectX 12バックエンド初期化形式を使用する
+	ImGui_ImplDX12_Init(&initInfo);
+
+	io.Fonts->Build();
+}
+
+/// <summary>
+/// ImGuiの終了
+/// </summary>
+void GraphicsDevice::FinalizeImGui() {
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
+}
+
+/// <summary>
+/// ImGuiのフレーム開始
+/// </summary>
+void GraphicsDevice::BeginImGuiFrame() {
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+}
+
+/// <summary>
+/// ImGuiの描画コマンドを積む
+/// </summary>
+void GraphicsDevice::DrawImGui() {
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandContext_.GetCommandList());
+}
+
+#endif // USE_IMGUI
