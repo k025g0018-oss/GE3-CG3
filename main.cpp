@@ -396,6 +396,7 @@ void DrawFlowGraph(const ParticleSystem& particleSystem, const Primitive3D& prim
 // 描画統計を表示する
 void DrawStatistics(
 	const std::string& adapterName,
+	FrameRateController& frameRateController,
 	const ParticleSystem& particleSystem,
 	Camera& camera,
 	DebugCamera& debugCamera,
@@ -417,6 +418,15 @@ void DrawStatistics(
 		"FPS : %.1f",
 		ImGui::GetIO().Framerate
 	);
+
+	// 前のフレームからの経過時間 (ミリ秒)
+	ImGui::Text("DeltaTime : %.2f ms", frameRateController.GetDeltaTime() * 1000.0f);
+
+	// FPS固定のオンオフ (オフにするとVSyncのみ = モニターのHzで動く)
+	bool isFixFPS = frameRateController.IsFixFPS();
+	if (ImGui::Checkbox("Fix 60FPS", &isFixFPS)) {
+		frameRateController.SetFixFPS(isFixFPS);
+	}
 
 	ImGui::Text(
 		"GPU : %s",
@@ -1596,6 +1606,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			DrawContentBrowserAssets(textureManager);
 			DrawStatistics(
 				graphicsDevice->GetAdapterName(),
+				*graphicsDevice->GetFrameRateController(),
 				particleSystem,
 				camera,
 				debugCamera,
