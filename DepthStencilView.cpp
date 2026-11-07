@@ -12,7 +12,7 @@ DepthStencilView::~DepthStencilView() {
 // DepthStencilTextureとDSVを作成
 void DepthStencilView::Initialize(ID3D12Device* device, const DescriptorHeap& dsvDescriptorHeap, int32_t width, int32_t height) {
 	// 深度ステンシルテクスチャリソースを作る
-	// 生成したResourceの所有権をResourceObjectへ渡す
+	// 生成したResourceの所有権をComPtrへ渡す
 	depthStencilResource_ = CreateDepthStencilTextureResource(device, width, height);
 
 	// DSVの設定
