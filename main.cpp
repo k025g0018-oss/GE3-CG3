@@ -26,6 +26,7 @@
 #include "DebugCamera.h"
 #include "Window.h"
 #include "GraphicsDevice.h"
+#include "D3DResourceLeakChecker.h"
 
 #include <cstdint> // int32_t
 #include <string> // 文字列
@@ -743,19 +744,6 @@ void DrawContentBrowserAssets(const TextureManager& textureManager) {
 #endif
 
 #pragma endregion 関数の定義エリア
-
-/// --- DirectX12リソースリークチェック ---
-struct D3DResourceLeakChecker {
-	~D3DResourceLeakChecker() {
-		// すべてのComPtrが解放された後にリソースリークを確認する
-		ComPtr<IDXGIDebug1> debug;
-		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(debug.GetAddressOf())))) {
-			debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-			debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
-			debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
-		}
-	}
-};
 
 ///// ----- メイン処理 ----- /////
 
