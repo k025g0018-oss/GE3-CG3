@@ -841,29 +841,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 描画コマンドを積むCommandListを取得する
 		ID3D12GraphicsCommandList* commandList = graphicsDevice->GetCommandList();
 
-		/// --- SwapChainの生成 ---
-
-		// GraphicsDeviceが作ったスワップチェーンを借りる
-		IDXGISwapChain4* swapChain = graphicsDevice->GetSwapChain();
-
 		/// --- DescriptorHeap ---
 
 		// GraphicsDeviceが作った各種ディスクリプタヒープを借りる
 		DescriptorHeap& srvDescriptorHeap = graphicsDevice->GetSrvDescriptorHeap();
 
-		/// --- バックバッファ ---
-
-		// GraphicsDeviceが取得したバックバッファを借りる (リサイズで作り直すので参照で受け取る)
-		const std::array<ComPtr<ID3D12Resource>, GraphicsDevice::kBackBufferCount>& swapChainResources =
-			graphicsDevice->GetSwapChainResources();
-
 		/// --- RTV ---
 
 		// GraphicsDeviceが作ったRTVの設定を借りる (ImGuiとリサイズで使う)
 		const D3D12_RENDER_TARGET_VIEW_DESC& rtvDesc = graphicsDevice->GetRtvDesc();
-		// GraphicsDeviceが作ったRTVのハンドルを借りる (描画先の指定とリサイズで使う)
-		const std::array<D3D12_CPU_DESCRIPTOR_HANDLE, GraphicsDevice::kBackBufferCount>& rtvHandles =
-			graphicsDevice->GetRtvHandles();
 
 		///// ----- PSO(Pipeline State Object) ----- /////
 
@@ -2351,38 +2337,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				sprite2D.Draw(commandList, spriteTextureHandle);
 			}
 
-			// 画面表示できるようにする
-			// 今回はRenderTargetからPresentにする
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-
-			// 実際のcommandListのImGuiの描画コマンドを積む
-#ifdef USE_IMGUI
-				// ゲーム描画をImGuiから読める状態へ戻し、UIはSwapChainへ描画する
-			sceneRenderTexture.TransitionToShaderResource(commandList);
-			commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, nullptr);
-			const float editorClearColor[] = {0.08f, 0.08f, 0.08f, 1.0f};
-			commandList->ClearRenderTargetView(
-				rtvHandles[backBufferIndex],
-				editorClearColor,
-				0,
-				nullptr);
-			// ImGuiは固定1280x720ではなく、現在のBackBuffer全体へ描画する
-			commandList->RSSetViewports(1, &graphicsDevice->GetBackBufferViewport());
-			commandList->RSSetScissorRects(1, &graphicsDevice->GetBackBufferScissorRect());
-			// ImGuiの描画コマンドを積む
-			graphicsDevice->DrawImGui();
-
-#endif // USE_IMGUI
-
-			// TransitionBarrerを張る
-			commandList->ResourceBarrier(1, &barrier);
-
-			///// ----- CommandContext ----- /////
-
-			/// --- コマンドの実行 ---
-			// コマンドを実行して画面を表示する
-			commandContext->ExecuteAndPresent(swapChain);
+			// DirectX描画終了
+			graphicsDevice->PostDraw();
+			
 #pragma endregion コマンドを積む処理
 
 		} // whileの終わり

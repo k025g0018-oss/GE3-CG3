@@ -155,6 +155,46 @@ void GraphicsDevice::PreDraw() {
 /// 描画後処理
 /// </summary>
 void GraphicsDevice::PostDraw() {
+
+	ID3D12GraphicsCommandList* commandList = commandContext_.GetCommandList();
+
+	/// --- バックバッファの番号取得 ---
+	// PreDrawとは関数が分かれてスコープが別になったので、もう一度取得する
+	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+
+#ifdef USE_IMGUI
+
+	/// --- ImGuiの描画 ---
+	if (sceneRenderTexture_) {
+		// ゲーム描画をImGuiから読める状態へ戻す
+		sceneRenderTexture_->TransitionToShaderResource(commandList);
+	}
+	// UIはバックバッファへ描画する
+	commandList->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], false, nullptr);
+	if (sceneRenderTexture_) {
+		const float editorClearColor[] = {0.08f, 0.08f, 0.08f, 1.0f};
+		commandList->ClearRenderTargetView(rtvHandles_[backBufferIndex], editorClearColor, 0, nullptr);
+	}
+	// ImGuiは現在のバックバッファ全体へ描画する
+	commandList->RSSetViewports(1, &backBufferViewport_);
+	commandList->RSSetScissorRects(1, &backBufferScissorRect_);
+	DrawImGui();
+
+#endif // USE_IMGUI
+
+	/// --- リソースバリアで表示状態に変更 ---
+	D3D12_RESOURCE_BARRIER barrier{};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = swapChainResources_[backBufferIndex].Get();
+	// 描画状態 → 表示状態
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+	commandList->ResourceBarrier(1, &barrier);
+
+	/// --- コマンドの実行と画面の交換 ---
+	// クローズ・実行・画面交換の通知・Fence値の更新・シグナル・完了待ち・リセットまでまとめて行う
+	commandContext_.ExecuteAndPresent(swapChain_.Get());
 }
 
 /// <summary>
