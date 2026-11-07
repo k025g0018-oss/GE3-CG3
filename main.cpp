@@ -1863,14 +1863,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					v.position.z = z + p2_Translate[2];
 					vertexData[i + 12] = v;
 				}
-			} else if (renderingMode == 5) {
-				// 5: 演出モード
-
-				// Particle用の三角形をVertexBufferへ書き込む
-				particleSystem.WriteTriangleVertices(vertexData);
-
-				// 移動、回転、壁反射、Particleの追加を行う
-				particleSystem.Update();
 			}
 
 #endif
@@ -2182,7 +2174,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region
 			///// ----- コマンドを積む ----- /////
-			
+
 			// DirectX描画開始
 			graphicsDevice->PreDraw();
 
@@ -2343,14 +2335,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// DirectX描画終了
 			graphicsDevice->PostDraw();
-			
+
 #pragma endregion コマンドを積む処理
 
 		} // whileの終わり
 
 		/// --- ImGui終了処理 ---
 #ifdef USE_IMGUI
-	
+
 		sceneRenderTexture.Finalize();
 
 #endif // USE_IMGUI
