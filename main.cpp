@@ -1877,7 +1877,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// Production Modeだけは既存のParticleSystem用頂点バッファを使用する
 			if (renderingMode == 5) {
 				particleSystem.WriteTriangleVertices(vertexData);
-				particleSystem.Update();
+				particleSystem.Update(deltaTime);
 			}
 
 			///// ----- 行列の計算 ----- /////

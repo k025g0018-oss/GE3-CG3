@@ -13,6 +13,7 @@ ParticleSystem::~ParticleSystem() {
 }
 
 /// --- 初期化 ---
+
 // 移動範囲と最大数を設定し、最初のParticleを生成
 void ParticleSystem::Initialize(ID3D12Device* device, float fieldMin, float fieldMax, uint32_t maxParticleCount) {
 	assert(device != nullptr);
@@ -45,8 +46,10 @@ void ParticleSystem::Initialize(ID3D12Device* device, float fieldMin, float fiel
 }
 
 /// --- 更新 ---
+
 // 移動、回転、壁反射、Particleの追加を行う
-void ParticleSystem::Update() {
+void ParticleSystem::Update(float deltaTime) {
+
 	// このフレームで通過した処理をParticle Flowパネル用に記録する
 	debugFlowState_ = {};
 	debugFlowState_.updateExecuted = true;
@@ -61,11 +64,11 @@ void ParticleSystem::Update() {
 	debugFlowState_.moveExecuted = updateParticleCount > 0;
 	debugFlowState_.collisionChecked = updateParticleCount > 0;
 
-	// 1_現在存在するParticleを移動する
+	// 1_現在存在するParticleを移動する (速さは1秒あたりなので、経過時間をかける)
 	for (size_t i = 0; i < updateParticleCount; ++i) {
 		Particle& particle = particles_[i];
-		particle.position = particle.position + particle.velocity;
-		particle.rotate.z += particle.angularVelocity;
+		particle.position = particle.position + particle.velocity * deltaTime;
+		particle.rotate.z += particle.angularVelocity * deltaTime;
 
 		// 2_壁に当たったParticleを反射する
 		const bool collided = ReflectAtFieldWall(particle);
@@ -93,6 +96,7 @@ void ParticleSystem::Update() {
 }
 
 /// --- 頂点データ ---
+
 // Particleで使用する三角形の頂点を書き込む
 void ParticleSystem::WriteTriangleVertices(VertexData* vertexData) const {
 	assert(vertexData != nullptr);
@@ -109,6 +113,7 @@ void ParticleSystem::WriteTriangleVertices(VertexData* vertexData) const {
 }
 
 /// --- 描画 ---
+
 // ParticleごとのWVPを設定して三角形を描画
 void ParticleSystem::Draw(ID3D12GraphicsCommandList* commandList, const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix) {
 	assert(commandList != nullptr);
@@ -145,6 +150,7 @@ void ParticleSystem::Draw(ID3D12GraphicsCommandList* commandList, const Matrix4x
 }
 
 /// --- リセット ---
+
 // 全Particleを削除して1個目を生成
 void ParticleSystem::Reset() {
 	// 手動Resetと最大数到達ResetのどちらもFlowパネルへ通知する
@@ -156,6 +162,7 @@ void ParticleSystem::Reset() {
 }
 
 /// --- 取得 ---
+
 // 先頭のParticleを取得
 const ParticleSystem::Particle* ParticleSystem::GetFirstParticle() const {
 	if (particles_.empty()) {
@@ -165,15 +172,18 @@ const ParticleSystem::Particle* ParticleSystem::GetFirstParticle() const {
 }
 
 /// --- Particleの生成 ---
+
 // ランダムな位置、方向、速さ、回転でParticleを作成
 ParticleSystem::Particle ParticleSystem::CreateParticle() {
 	constexpr float kPi = 3.14159265358979323846f;
 
 	std::uniform_real_distribution<float> scaleDist(0.15f, 0.35f);
 	std::uniform_real_distribution<float> directionDist(0.0f, kPi * 2.0f);
-	std::uniform_real_distribution<float> speedDist(0.005f, 0.025f);
+	// 1秒あたりの速さ (今までの1フレームあたりの値 × 60)
+	std::uniform_real_distribution<float> speedDist(0.3f, 1.5f);
 	std::uniform_real_distribution<float> rotateDist(-kPi, kPi);
-	std::uniform_real_distribution<float> angularVelocityDist(-0.02f, 0.02f);
+	// 1秒あたりの回転量 (今までの1フレームあたりの値 × 60)
+	std::uniform_real_distribution<float> angularVelocityDist(-1.2f, 1.2f);
 
 	Particle particle{};
 	particle.scale = {
@@ -210,6 +220,7 @@ ParticleSystem::Particle ParticleSystem::CreateParticle() {
 }
 
 /// --- 壁との反射 ---
+
 // Particleを範囲内へ戻し、移動方向を反転
 bool ParticleSystem::ReflectAtFieldWall(Particle& particle) {
 	bool collided = false;
@@ -243,6 +254,7 @@ bool ParticleSystem::ReflectAtFieldWall(Particle& particle) {
 }
 
 /// --- 終了処理 ---
+
 // Particle用のWVPResourceを解放
 void ParticleSystem::Finalize() {
 	particles_.clear();
