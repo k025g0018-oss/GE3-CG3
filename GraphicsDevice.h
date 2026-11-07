@@ -6,6 +6,7 @@
 #include "DxcCompiler.h"
 #include "Window.h"
 #include "BufferResource.h"
+#include "FrameRateController.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -392,6 +393,9 @@ private:
 
 	// バックバッファ全体のシザー矩形 (ウィンドウの大きさに追従する)
 	D3D12_RECT backBufferScissorRect_{};
+
+	// フレームレートの管理 (FPS固定)
+	FrameRateController frameRateController_;
 
 #ifdef USE_IMGUI
 

@@ -1,6 +1,9 @@
 #include "Window.h"
 
 #include <cassert>
+#include <timeapi.h>
+
+#pragma comment(lib, "winmm.lib")
 
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
@@ -94,6 +97,9 @@ void Window::Initialize() {
 	HRESULT hr = CoInitializeEx(0, COINIT_MULTITHREADED);
 	assert(SUCCEEDED(hr));
 
+	// システムタイマーの分解能を上げる (sleepの精度を1ミリ秒にする)
+	timeBeginPeriod(1);
+
 	// ウィンドウプロシージャ
 	wc_.lpfnWndProc = WindowProc;
 	// ウィンドウクラス名(何でもよい)
@@ -154,6 +160,8 @@ void Window::Finalize() {
 	CloseWindow(hwnd_);
 	//登録したウィンドウクラスを解除する
 	UnregisterClass(wc_.lpszClassName, wc_.hInstance);
+	// システムタイマーの分解能を元に戻す
+	timeEndPeriod(1);
 	// COMの終了処理
 	CoUninitialize();
 }

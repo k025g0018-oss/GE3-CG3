@@ -1,6 +1,6 @@
 #include "Matrix4x4.h"
 #include "Primitive3D.h"
-#include "Vector.h
+#include "Vector.h"
 #include "Collision.h"
 #include "CommandContext.h"
 #include "DepthStencilView.h"

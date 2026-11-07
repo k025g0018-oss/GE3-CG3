@@ -31,6 +31,9 @@ void GraphicsDevice::Initialize(Window* window, std::ostream& logStream) {
 	// 借りてきたWindowのインスタンスを記録
 	window_ = window;
 
+	// FPS固定の初期化
+	frameRateController_.Initialize();
+
 	// デバイスの初期化 (ID3D12Device)
 	InitializeDevice(logStream);
 
@@ -103,9 +106,11 @@ void GraphicsDevice::PreDraw() {
 	ID3D12GraphicsCommandList* commandList = commandContext_.GetCommandList();
 
 	/// --- バックバッファの番号取得 ---
+
 	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
 
 	/// --- リソースバリアで書き込み可能に変更 ---
+
 	D3D12_RESOURCE_BARRIER barrier{};
 	// 今回のバリアはTransition
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -118,6 +123,7 @@ void GraphicsDevice::PreDraw() {
 	commandList->ResourceBarrier(1, &barrier);
 
 	/// --- 描画先のRTVとDSVを指定する ---
+
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = depthStencilView_.GetHandle();
 	D3D12_CPU_DESCRIPTOR_HANDLE gameRenderTarget = rtvHandles_[backBufferIndex];
 
@@ -134,20 +140,25 @@ void GraphicsDevice::PreDraw() {
 	commandList->OMSetRenderTargets(1, &gameRenderTarget, false, &dsvHandle);
 
 	/// --- 画面全体の色をクリア ---
+
 	const float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f}; // 青っぽい色。RGBAの順
 	commandList->ClearRenderTargetView(gameRenderTarget, clearColor, 0, nullptr);
 
 	/// --- 画面全体の深度をクリア ---
+
 	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	/// --- SRV用のデスクリプタヒープを指定する ---
+
 	ID3D12DescriptorHeap* descriptorHeaps[] = {srvDescriptorHeap_.Get()};
 	commandList->SetDescriptorHeaps(1, descriptorHeaps);
 
 	/// --- ビューポート領域の設定 ---
+
 	commandList->RSSetViewports(1, &viewport_);
 
 	/// --- シザー矩形の設定 ---
+
 	commandList->RSSetScissorRects(1, &scissorRect_);
 }
 
@@ -159,12 +170,14 @@ void GraphicsDevice::PostDraw() {
 	ID3D12GraphicsCommandList* commandList = commandContext_.GetCommandList();
 
 	/// --- バックバッファの番号取得 ---
+
 	// PreDrawとは関数が分かれてスコープが別になったので、もう一度取得する
 	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
 
 #ifdef USE_IMGUI
 
 	/// --- ImGuiの描画 ---
+
 	if (sceneRenderTexture_) {
 		// ゲーム描画をImGuiから読める状態へ戻す
 		sceneRenderTexture_->TransitionToShaderResource(commandList);
@@ -183,6 +196,7 @@ void GraphicsDevice::PostDraw() {
 #endif // USE_IMGUI
 
 	/// --- リソースバリアで表示状態に変更 ---
+
 	D3D12_RESOURCE_BARRIER barrier{};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -193,8 +207,14 @@ void GraphicsDevice::PostDraw() {
 	commandList->ResourceBarrier(1, &barrier);
 
 	/// --- コマンドの実行と画面の交換 ---
+
 	// クローズ・実行・画面交換の通知・Fence値の更新・シグナル・完了待ち・リセットまでまとめて行う
 	commandContext_.ExecuteAndPresent(swapChain_.Get());
+
+	/// --- FPS固定 ---
+
+	// VSync待ちとコマンドの完了待ちの後に、1/60秒たつまで待つ
+	frameRateController_.Update();
 }
 
 /// <summary>
