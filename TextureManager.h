@@ -10,6 +10,9 @@
 #include <string>
 #include <wrl.h>
 
+// 前方宣言
+class GraphicsDevice;
+
 ///// ----- TextureManager ----- /////
 
 class TextureManager {
@@ -25,7 +28,7 @@ public:
 
 	/// --- 初期化 ---
 	// Textureを読み込み、GPUへの転送とSRVの作成を行う
-	void Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const DescriptorHeap& srvDescriptorHeap);
+	void Initialize(GraphicsDevice* graphicsDevice);
 
 	/// --- 転送完了後の処理 ---
 	// GPU転送用のResourceを解放

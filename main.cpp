@@ -1,7 +1,6 @@
 #include "Matrix4x4.h"
 #include "Primitive3D.h"
-#include "Vector.h"
-#include "BufferResource.h"
+#include "Vector.h
 #include "Collision.h"
 #include "CommandContext.h"
 #include "DepthStencilView.h"
@@ -853,7 +852,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
 		ComPtr<ID3D12Resource> wvpResource;
 		// Createが返した所有権をComPtrへ移す
-		wvpResource = BufferResource::Create(device, sizeof(TransformationMatrix));
+		wvpResource = graphicsDevice->CreateBufferResource(sizeof(TransformationMatrix));
 		// データを書き込む
 		TransformationMatrix* wvpData = nullptr;
 		// 書き込むためのアドレスを取得
@@ -900,7 +899,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- Material用のリソースを作る ---
 		ComPtr<ID3D12Resource> materialResource;
 		// Createが返した所有権をComPtrへ移す
-		materialResource = BufferResource::Create(device, sizeof(Material));
+		materialResource = graphicsDevice->CreateBufferResource(sizeof(Material));
 		// マテリアルにデータを書き込む
 		Material* materialData = nullptr;
 		// 書き込むためのアドレスを取得
@@ -918,7 +917,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 平行光源用の定数バッファを作成する ---
 		ComPtr<ID3D12Resource> directionalLightResource;
 		// Createが返した所有権をComPtrへ移す
-		directionalLightResource = BufferResource::Create(device, sizeof(DirectionalLight));
+		directionalLightResource = graphicsDevice->CreateBufferResource(sizeof(DirectionalLight));
 		// CPUから光源情報を書き込むアドレス
 		DirectionalLight* directionalLightData = nullptr;
 		HRESULT directionalLightMapResult =
@@ -979,7 +978,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// Textureを読み込み、GPUへの転送とSRVの作成を行う
 		TextureManager textureManager;
-		textureManager.Initialize(device, commandList, srvDescriptorHeap);
+		textureManager.Initialize(graphicsDevice);
 
 		/// --- Texture転送コマンドの実行 ---
 

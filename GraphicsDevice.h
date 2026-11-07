@@ -5,6 +5,7 @@
 #include "DepthStencilView.h"
 #include "DxcCompiler.h"
 #include "Window.h"
+#include "BufferResource.h"
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -50,6 +51,13 @@ public:
 	/// 描画後処理 (コマンドをGPUに送って画面を更新する)
 	/// </summary>
 	void PostDraw();
+
+	/// <summary>
+	/// バッファリソースの生成 (デバイスは自分のものを使う)
+	/// </summary>
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(size_t sizeInBytes) const {
+		return BufferResource::Create(device_.Get(), sizeInBytes);
+	}
 
 #ifdef USE_IMGUI
 

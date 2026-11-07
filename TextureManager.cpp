@@ -1,5 +1,5 @@
 #include "TextureManager.h"
-
+#include "GraphicsDevice.h"
 #include "BufferResource.h"
 #include "Logger.h"
 #include "StringUtility.h"
@@ -17,7 +17,12 @@ TextureManager::~TextureManager() {
 
 /// --- 初期化 ---
 // Textureを読み込み、GPUへの転送とSRVの作成を行う
-void TextureManager::Initialize(ID3D12Device* device, ID3D12GraphicsCommandList* commandList, const DescriptorHeap& srvDescriptorHeap) {
+void TextureManager::Initialize(GraphicsDevice* graphicsDevice) {
+
+	ID3D12Device* device = graphicsDevice->GetDevice();
+	ID3D12GraphicsCommandList* commandList = graphicsDevice->GetCommandList();
+	const DescriptorHeap& srvDescriptorHeap = graphicsDevice->GetSrvDescriptorHeap();
+
 	// テクスチャのファイルパス 番号1~ 0はImGuiが使う
 	const char* textureFilePaths[kTextureCount] = {
 		"resources/white.png",
