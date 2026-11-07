@@ -1279,6 +1279,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			Window::kClientHeight,
 			rtvDesc.Format);
 
+		// ゲーム画面の描画先をGraphicsDeviceに教える
+		graphicsDevice->SetSceneRenderTexture(&sceneRenderTexture);
+
 		// ImGuiの初期化はGraphicsDeviceで済んでいるので、入力の情報だけ受け取る
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -2189,46 +2192,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #pragma region
 			///// ----- コマンドを積む ----- /////
-			// これから書き込むバックバッファのインデックスを取得
-			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+			
+			// DirectX描画開始
+			graphicsDevice->PreDraw();
 
-			// TransitionBarrierの設定
-			D3D12_RESOURCE_BARRIER barrier{};
-			// 今回のバリアはTransition
-			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			// Noneにしておく
-			barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-			// バリアを張る対象のリソース。現在のバックバッファに対して行う
-			barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
-			// 遷移前(現在)のResourceState
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-			// 遷移後のResourceState
-			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			// TransitionBarrierを張る
-			commandList->ResourceBarrier(1, &barrier);
-
-			// 描画先のRTVとDSVを設定する
-			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = graphicsDevice->GetDsvHandle();
-			D3D12_CPU_DESCRIPTOR_HANDLE gameRenderTarget = rtvHandles[backBufferIndex];
-#ifdef USE_IMGUI
-			// エディター有効時はゲームをScene用テクスチャへ描画する
-			sceneRenderTexture.TransitionToRenderTarget(commandList);
-			gameRenderTarget = sceneRenderTexture.GetRTVHandle();
-#endif // USE_IMGUI
-			commandList->OMSetRenderTargets(1, &gameRenderTarget, false, &dsvHandle);
-			// 指定した色で画面全体をクリアする
-			float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f}; // 青っぽい色。RGBAの順
-			commandList->ClearRenderTargetView(gameRenderTarget, clearColor, 0, nullptr);
-			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-			// 描画用のDescriptorHeapの設定
-			ID3D12DescriptorHeap* descriptorHeaps[] = {srvDescriptorHeap.Get()};
-			commandList->SetDescriptorHeaps(1, descriptorHeaps);
-
-			// 描画の設定(ドローコール)
-			// ViewportとScissorRectの設定
-			commandList->RSSetViewports(1, &graphicsDevice->GetViewport());
-			commandList->RSSetScissorRects(1, &graphicsDevice->GetScissorRect());
 			// RootSignatureの設定
 			commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
 			// PSOの設定

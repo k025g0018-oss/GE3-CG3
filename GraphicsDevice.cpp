@@ -99,6 +99,56 @@ void GraphicsDevice::Finalize() {
 /// 描画前処理
 /// </summary>
 void GraphicsDevice::PreDraw() {
+
+	ID3D12GraphicsCommandList* commandList = commandContext_.GetCommandList();
+
+	/// --- バックバッファの番号取得 ---
+	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
+
+	/// --- リソースバリアで書き込み可能に変更 ---
+	D3D12_RESOURCE_BARRIER barrier{};
+	// 今回のバリアはTransition
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	// 現在のバックバッファに対して行う
+	barrier.Transition.pResource = swapChainResources_[backBufferIndex].Get();
+	// 表示状態 → 描画状態
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	commandList->ResourceBarrier(1, &barrier);
+
+	/// --- 描画先のRTVとDSVを指定する ---
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = depthStencilView_.GetHandle();
+	D3D12_CPU_DESCRIPTOR_HANDLE gameRenderTarget = rtvHandles_[backBufferIndex];
+
+#ifdef USE_IMGUI
+
+	// エディター有効時はゲームをScene用テクスチャへ描画する
+	if (sceneRenderTexture_) {
+		sceneRenderTexture_->TransitionToRenderTarget(commandList);
+		gameRenderTarget = sceneRenderTexture_->GetRTVHandle();
+	}
+
+#endif // USE_IMGUI
+
+	commandList->OMSetRenderTargets(1, &gameRenderTarget, false, &dsvHandle);
+
+	/// --- 画面全体の色をクリア ---
+	const float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f}; // 青っぽい色。RGBAの順
+	commandList->ClearRenderTargetView(gameRenderTarget, clearColor, 0, nullptr);
+
+	/// --- 画面全体の深度をクリア ---
+	commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	/// --- SRV用のデスクリプタヒープを指定する ---
+	ID3D12DescriptorHeap* descriptorHeaps[] = {srvDescriptorHeap_.Get()};
+	commandList->SetDescriptorHeaps(1, descriptorHeaps);
+
+	/// --- ビューポート領域の設定 ---
+	commandList->RSSetViewports(1, &viewport_);
+
+	/// --- シザー矩形の設定 ---
+	commandList->RSSetScissorRects(1, &scissorRect_);
 }
 
 /// <summary>
