@@ -1368,6 +1368,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				break;
 			}
 
+			// 前のフレームからの経過時間 (秒)
+			const float deltaTime = graphicsDevice->GetFrameRateController()->GetDeltaTime();
+
 			// WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
 			RECT clientRect{};
 			GetClientRect(window->GetHwnd(), &clientRect);
@@ -1648,26 +1651,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			/// --- Spriteの移動 ---
 
-			// 1フレームで動く量(ピクセル)
-			const float kSpriteSpeed = 5.0f;
+			// 1秒で動く量(ピクセル) 今までの5ピクセル × 60フレーム
+			const float kSpriteSpeed = 300.0f;
+
+			// このフレームで動く量 (FPSが変わっても1秒で動く距離は同じになる)
+			const float spriteMove = kSpriteSpeed * deltaTime;
 
 			// Spriteの位置を参照で受け取って、直接書き換える
 			Transform& spriteTransform = sprite2D.GetTransform();
 
 			// 左右キーで横に動かす
 			if (input->IsPress(DIK_LEFT)) {
-				spriteTransform.translate.x -= kSpriteSpeed;
+				spriteTransform.translate.x -= spriteMove;
 			}
 			if (input->IsPress(DIK_RIGHT)) {
-				spriteTransform.translate.x += kSpriteSpeed;
+				spriteTransform.translate.x += spriteMove;
 			}
 
 			// 上下キーで縦に動かす(画面座標は下がプラスなので、上はマイナス)
 			if (input->IsPress(DIK_UP)) {
-				spriteTransform.translate.y -= kSpriteSpeed;
+				spriteTransform.translate.y -= spriteMove;
 			}
 			if (input->IsPress(DIK_DOWN)) {
-				spriteTransform.translate.y += kSpriteSpeed;
+				spriteTransform.translate.y += spriteMove;
 			}
 
 			///// ----- ゲームの処理 ----- /////
