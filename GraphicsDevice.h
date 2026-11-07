@@ -15,6 +15,9 @@
 #include <vector>
 #include <cassert>
 
+// 前方宣言
+class SceneRenderTexture;
+
 /// <summary>
 /// DirectX基盤
 /// </summary>
@@ -38,6 +41,16 @@ public:
 	/// <returns>作り直したらtrue (大きさが同じなら何もしないでfalse)</returns>
 	bool Resize(uint32_t width, uint32_t height);
 
+	/// <summary>
+	/// 描画前処理 (バックバッファを描画できる状態に整える)
+	/// </summary>
+	void PreDraw();
+
+	/// <summary>
+	/// 描画後処理 (コマンドをGPUに送って画面を更新する)
+	/// </summary>
+	void PostDraw();
+
 #ifdef USE_IMGUI
 
 	/// <summary>
@@ -49,6 +62,13 @@ public:
 	/// ImGuiの描画コマンドを積む
 	/// </summary>
 	void DrawImGui();
+
+	/// <summary>
+	/// ゲーム画面の描画先にするScene用テクスチャを設定する 借りるだけ
+	/// </summary>
+	void SetSceneRenderTexture(SceneRenderTexture* sceneRenderTexture) {
+		sceneRenderTexture_ = sceneRenderTexture;
+	}
 
 #endif // USE_IMGUI
 
@@ -369,6 +389,9 @@ private:
 
 	// ImGuiに渡すSRVの割り当て係 (ImGuiが使っている間は消えてはいけない)
 	ImGuiSrvDescriptorAllocator imguiSrvAllocator_;
+
+	// ゲーム画面の描画先 (ImGuiのSceneパネル用) 借りるだけ
+	SceneRenderTexture* sceneRenderTexture_ = nullptr;
 
 #endif // USE_IMGUI
 

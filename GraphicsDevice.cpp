@@ -2,6 +2,7 @@
 #include "Window.h"
 #include "Logger.h"
 #include "StringUtility.h"
+#include "SceneRenderTexture.h"
 
 #include <cassert>
 #include <format>
@@ -92,6 +93,18 @@ void GraphicsDevice::Finalize() {
 	commandContext_.Finalize();
 
 	// ComPtrなので、デストラクタで自動解放される
+}
+
+/// <summary>
+/// 描画前処理
+/// </summary>
+void GraphicsDevice::PreDraw() {
+}
+
+/// <summary>
+/// 描画後処理
+/// </summary>
+void GraphicsDevice::PostDraw() {
 }
 
 /// <summary>
