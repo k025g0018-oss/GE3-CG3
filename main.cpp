@@ -848,7 +848,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		/// --- RTV ---
 
-		// GraphicsDeviceが作ったRTVの設定を借りる (ImGuiとリサイズで使う)
+		// GraphicsDeviceが作ったRTVの設定を借りる (Scene用テクスチャのフォーマットに使う)
 		const D3D12_RENDER_TARGET_VIEW_DESC& rtvDesc = graphicsDevice->GetRtvDesc();
 
 		///// ----- PSO(Pipeline State Object) ----- /////
