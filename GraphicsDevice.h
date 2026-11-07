@@ -221,6 +221,13 @@ public:
 		return srvDescriptorHeap_.GetGPUHandle(index);
 	}
 
+	/// <summary>
+	/// フレームレートの管理 (deltaTimeの取得やFPS固定の切り替え)
+	/// </summary>
+	FrameRateController* GetFrameRateController() {
+		return &frameRateController_;
+	}
+
 	///// ----- ===== ----- /////
 
 private:

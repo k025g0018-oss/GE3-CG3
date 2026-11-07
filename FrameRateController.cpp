@@ -29,7 +29,8 @@ void FrameRateController::Update() {
 	/// --- 3_1/60秒(よりわずかに短い時間)たっていない場合 ---
 	// 今回の肝、前回から1/60秒たつまで待機する
 	// kMinCheckTimeで判定するので、60Hzちょい上のモニターはVSync後に待たずにスルーする
-	if (elapsed < kMinCheckTime) {
+	// FPS固定をオフにしているときは待たない (VSyncのみ)
+	if (isFixFPS_ && elapsed < kMinCheckTime) {
 		// 1/60秒経過するまで微小なスリープを繰り返す
 		while (Clock::now() - reference_ < kMinTime) {
 			// 1マイクロ秒スリープ
@@ -38,8 +39,19 @@ void FrameRateController::Update() {
 	}
 
 	/// --- 4_現在の時間を記録する ---
-	// 次フレームの2_の計算に使うため、待機完了後の時間を記録しておく
+	// 待機完了後の時間
+	Clock::time_point current = Clock::now();
+
+	/// --- 5_deltaTimeを計算する ---
+	// 前回の記録から今回の記録までが、1フレームにかかった時間 (秒)
+	deltaTime_ = duration<float>(current - reference_).count();
+	// 止まっていた後に大きくワープしないように上限をつける
+	if (deltaTime_ > kMaxDeltaTime) {
+		deltaTime_ = kMaxDeltaTime;
+	}
+
+	// 次フレームの2_と5_の計算に使うため、待機完了後の時間を記録しておく
 	// これらの処理によって、毎フレームの4_の間隔がぴったり1/60秒に固定される
 	// (ただし、処理落ち・描画落ちしている場合はこの限りではない)
-	reference_ = Clock::now();
+	reference_ = current;
 }
