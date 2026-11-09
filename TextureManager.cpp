@@ -6,12 +6,14 @@
 
 #include "externals/DirectXTex/d3dx12.h"
 
+#include <filesystem>
 #include <cassert>
 #include <vector>
 
 ///// ----- TextureManager ----- /////
 
 TextureManager::~TextureManager() {
+
 	Finalize();
 }
 
@@ -25,11 +27,12 @@ void TextureManager::Initialize(GraphicsDevice* graphicsDevice) {
 
 	// テクスチャのファイルパス 番号1~ 0はImGuiが使う
 	const char* textureFilePaths[kTextureCount] = {
-		"resources/white.png",
-		"resources/uvChecker.png",
-		"resources/genbaneko.png",
-		"resources/monsterBall.png",
-		"resources/checkerBoard.png"
+		"resources/images/white.png",
+		"resources/images/uvChecker.png",
+		"resources/images/genbaneko.png",
+		"resources/images/monsterBall.png",
+		"resources/images/checkerBoard.png",
+		"resources/models/fence/fence.png"
 	};
 
 	// ImGuiが0番を使うため、Texture用SRVは1番から使用する
@@ -58,6 +61,7 @@ void TextureManager::Initialize(GraphicsDevice* graphicsDevice) {
 /// --- 転送完了後の処理 ---
 // GPU転送用のResourceを解放
 void TextureManager::ReleaseIntermediateResources() {
+
 	// 転送が終わったのでソースは解放する
 	for (Microsoft::WRL::ComPtr<ID3D12Resource>& intermediateResource : intermediateResources_) {
 		// GPU転送完了後に中間Resourceの所有権を解放する
@@ -68,6 +72,7 @@ void TextureManager::ReleaseIntermediateResources() {
 /// --- 取得 ---
 // ImGuiで選択されたTextureのGPUハンドルを取得
 D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandle(uint32_t textureIndex) const {
+
 	assert(textureIndex < kTextureCount);
 	return shaderResourceView_.GetGPUHandle(textureIndex);
 }
@@ -75,21 +80,29 @@ D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandle(uint32_t textureIndex) 
 uint32_t TextureManager::FindTextureIndex(
 	const std::string& filePath
 ) const {
+
+	// フォルダ分けしても対応できるように、ファイル名だけで比較する
+	const std::string fileName = std::filesystem::path(filePath).filename().string();
+
 	// MTLで指定されたパスと読み込み済みテクスチャを対応させる
-	if (filePath == "resources/uvChecker.png") {
+	if (fileName == "uvChecker.png") {
 		return 1;
 	}
 
-	if (filePath == "resources/genbaneko.png") {
+	if (fileName == "genbaneko.png") {
 		return 2;
 	}
 
-	if (filePath == "resources/monsterBall.png") {
+	if (fileName == "monsterBall.png") {
 		return 3;
 	}
 
-	if (filePath == "resources/checkerBoard.png") {
+	if (fileName == "checkerBoard.png") {
 		return 4;
+	}
+
+	if (fileName == "fence.png") {
+		return 5;
 	}
 
 	// 対応する画像がない場合は白テクスチャを使う

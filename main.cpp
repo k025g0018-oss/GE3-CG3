@@ -770,7 +770,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		audio.Initialize();
 
 		// WAVファイルを読み込む
-		SoundData soundData1 = SoundLoadWave("resources/fanfare.wav");
+		SoundData soundData1 = SoundLoadWave("resources/sounds/se/fanfare.wav");
 
 		// ImGuiから音声のループ再生を切り替えるフラグ
 		bool isSoundPlaying = false;
@@ -1052,7 +1052,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// resourcesフォルダのplane.objを読み込む
 		planeModel.Initialize(
 			device,
-			"resources",
+			"resources/models/plane",
 			"plane.obj");
 
 		// 片面モデルの表側が初期状態でカメラを向くようにする
@@ -1074,7 +1074,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// resourcesフォルダのaxis.objを読み込む
 		axisModel.Initialize(
 			device,
-			"resources",
+			"resources/models/axis",
 			"axis.obj");
 
 		// Axisモデルの表示を切り替える
@@ -1093,7 +1093,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 複数Meshが含まれているOBJファイルを読み込む
 		multiMeshModel.Initialize(
 			device,
-			"resources",
+			"resources/models/multiMesh",
 			"multiMesh.obj");
 
 		// ちょいずらす
@@ -1115,7 +1115,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 複数Materialを使用するOBJファイルを読み込む
 		multiMaterialModel.Initialize(
 			device,
-			"resources",
+			"resources/models/multiMaterial",
 			"multiMaterial.obj");
 
 		// 他のモデルと重ならない位置へ移動する
@@ -1138,7 +1138,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// Model::InitializeからModelLoaderを通してbunny.objを読み込む
 		bunnyModel.Initialize(
 			device,
-			"resources",
+			"resources/models/bunny",
 			"bunny.obj");
 
 		// ほかのモデルと重ならない位置へ配置する
@@ -1165,7 +1165,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// Model::InitializeからModelLoaderを通してteapot.objを読み込む
 		teapotModel.Initialize(
 			device,
-			"resources",
+			"resources/models/teapot",
 			"teapot.obj");
 
 		// ほかのモデルと重ならない位置へ配置する
@@ -1192,7 +1192,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// Model::InitializeからModelLoaderを通してsuzanne.objを読み込む
 		suzanneModel.Initialize(
 			device,
-			"resources",
+			"resources/models/suzanne",
 			"suzanne.obj");
 
 		// ほかのモデルと重ならない位置へ配置する
