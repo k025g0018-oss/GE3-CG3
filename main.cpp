@@ -146,24 +146,6 @@ void DrawHierarchy(const std::vector<IEditorObject*>& editorObjects, IEditorObje
 	ImGui::End();
 }
 
-#if 0
-// 旧SelectedObject列挙型を使用する場合の名前変換処理として残す
-const char* GetSelectedObjectName(SelectedObject selectedObject) {
-	switch (selectedObject) {
-		case SelectedObject::Pyramid:
-			return "3D Object (Triangle / Pyramid)";
-		case SelectedObject::Sprite:
-			return "Sprite";
-		case SelectedObject::ParticleSystem:
-			return "ParticleSystem";
-		case SelectedObject::SceneSettings:
-			return "Scene Settings";
-		default:
-			return "None";
-	}
-}
-#endif
-
 // Scene用レンダーテクスチャをパネル内へ表示する カメラ操作
 bool DrawScene(
 	D3D12_GPU_DESCRIPTOR_HANDLE sceneSrvHandle,
@@ -867,6 +849,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		/// --- 初期化 ---
 
+		/*
+
 		// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
 		ComPtr<ID3D12Resource> wvpResource;
 		// Createが返した所有権をComPtrへ移す
@@ -878,6 +862,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 単位行列を書き込んでおく
 		wvpData->WVP = Matrix4x4::MakeIdentity4x4();
 		wvpData->World = Matrix4x4::MakeIdentity4x4();
+
+		*/
 
 		///// ----- ===== ----- /////
 
@@ -1014,37 +1000,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- 変数の宣言 ----- /////
 
-		/// 三角形
-		// Transformの変数を作る
-		// 3Dオブジェクトの状態をObject3Dへ集約し、既存の描画処理から参照して使う
+		/// --- 三角形・三角錐 ---
+
+		// 3Dオブジェクトの状態をPrimitive3Dへ集約し、既存の描画処理から参照して使う
 		Primitive3D primitive3D;
 		primitive3D.Initialize(device);
 		Transform& transform = primitive3D.GetTransform();
 
-		// カメラの回転
-		bool& isAutoRotate = primitive3D.GetIsPlaying();
-
 		// 描画モード
 		int& displayMode = primitive3D.GetDisplayMode();
-
-		// モード1で使う
-		float* t1_Scale = primitive3D.GetTriangle1Scale();
-		float* t1_Rotate = primitive3D.GetTriangle1Rotate();
-		float* t1_Translate = primitive3D.GetTriangle1Translate();
-
-		float* t2_Scale = primitive3D.GetTriangle2Scale();
-		float* t2_Rotate = primitive3D.GetTriangle2Rotate();
-		float* t2_Translate = primitive3D.GetTriangle2Translate();
-
-		// モード3で使う
-		// 三角錐1個目
-		float* p1_Scale = primitive3D.GetPyramid1Scale();
-		float* p1_Rotate = primitive3D.GetPyramid1Rotate();
-		float* p1_Translate = primitive3D.GetPyramid1Translate();
-		// 三角錐2個目
-		float* p2_Scale = primitive3D.GetPyramid2Scale();
-		float* p2_Rotate = primitive3D.GetPyramid2Rotate();
-		float* p2_Translate = primitive3D.GetPyramid2Translate();
 
 		///// ----- ParticleSystem ----- /////
 
@@ -1060,12 +1024,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			float(Window::kClientWidth) /
 			float(Window::kClientHeight));
 
+		/*
+
 		// Object3D用のWorld行列
 		Matrix4x4 worldMatrix =
 			Matrix4x4::MakeAffineMatrix(
 				transform.scale,
 				transform.rotate,
 				transform.translate);
+
+		*/
 
 		///// ----- デバッグカメラ ----- /////
 
@@ -1710,195 +1678,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			///// ----- ゲームの処理 ----- /////
+
 			/// --- カメラ ---
+
 			camera.Update();
 
 			/// --- デバッグカメラ ---
+
 			debugCamera.Update();
 
-			// 回転角を更新
-			// Start中だけObject3D自身が回転状態を更新する
-			// Primitive3Dの更新はCamera行列取得後に行う
+			/// --- ParticleSystemの更新 ---
 
-			/// --- モードに応じた頂点データの書き込み ---
 			// ImGuiで切り替えても、現在のフレームは同じモードで更新と描画を行う
 			const int renderingMode = displayMode;
-			// Primitive3Dへ移動する前の頂点生成処理は、比較できるよう残して無効化する
-#if 0
-			uint32_t drawVertexCount = 3; // デフォルト
 
-			if (renderingMode == 0) {
-				// None：Object3Dの頂点を作成しない
-				drawVertexCount = 0;
-
-			} else if (renderingMode == 1) {
-				// 1: 三角形1枚
-				drawVertexCount = 3;
-				VertexData triangleVertices[3] = {
-					{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, // 上
-					{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}}, // 右下
-					{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}}, // 左下
-				};
-				for (uint32_t i = 0; i < drawVertexCount; ++i) {
-					vertexData[i] = triangleVertices[i];
-				}
-			} else if (renderingMode == 2) {
-				// 2: 三角形2枚 (個別SRT)
-				drawVertexCount = 6;
-				// 三角形1個目
-				vertexData[0].position = {-0.5f, -0.5f, 0.0f, 1.0f};
-				vertexData[0].texcoord = {0.0f, 1.0f};
-				vertexData[1].position = {0.0f, 0.5f, 0.0f, 1.0f};
-				vertexData[1].texcoord = {0.5f, 0.0f};
-				vertexData[2].position = {0.5f, -0.5f, 0.0f, 1.0f};
-				vertexData[2].texcoord = {1.0f, 1.0f};
-
-				// 三角形2個目
-				vertexData[3].position = {-0.5f, -0.5f, 0.5f, 1.0f};
-				vertexData[3].texcoord = {0.0f, 1.0f};
-				vertexData[4].position = {0.0f, 0.0f, 0.0f, 1.0f};
-				vertexData[4].texcoord = {0.5f, 0.0f};
-				vertexData[5].position = {0.5f, -0.5f, -0.5f, 1.0f};
-				vertexData[5].texcoord = {1.0f, 1.0f};
-
-				// 1枚目の三角形の変形計算
-				for (uint32_t i = 0; i < 3; ++i) {
-					VertexData v = vertexData[i];
-
-					float x = v.position.x * t1_Scale[0];
-					float y = v.position.y * t1_Scale[1];
-					float z = v.position.z * t1_Scale[2];
-
-					// X軸回転
-					float cosX = cosf(t1_Rotate[0]); float sinX = sinf(t1_Rotate[0]);
-					float dy = y * cosX - z * sinX; float dz = y * sinX + z * cosX;
-					y = dy; z = dz;
-
-					// Y軸回転
-					float cosY = cosf(t1_Rotate[1]); float sinY = sinf(t1_Rotate[1]);
-					float dx = x * cosY + z * sinY; dz = -x * sinY + z * cosY;
-					x = dx; z = dz;
-
-					// Z軸回転
-					float cosZ = cosf(t1_Rotate[2]); float sinZ = sinf(t1_Rotate[2]);
-					dx = x * cosZ - y * sinZ; dy = x * sinZ + y * cosZ;
-					x = dx; y = dy;
-
-					// 平行移動
-					v.position.x = x + t1_Translate[0];
-					v.position.y = y + t1_Translate[1];
-					v.position.z = z + t1_Translate[2];
-
-					// 計算結果を上書き保存
-					vertexData[i] = v;
-				}
-
-				// 2枚目の三角形の変形計算
-				for (uint32_t i = 0; i < 3; ++i) {
-					// インデックスを「i + 3」にする
-					VertexData v = vertexData[i + 3];
-
-					float x = v.position.x * t2_Scale[0];
-					float y = v.position.y * t2_Scale[1];
-					float z = v.position.z * t2_Scale[2];
-
-					// X軸回転
-					float cosX = cosf(t2_Rotate[0]); float sinX = sinf(t2_Rotate[0]);
-					float dy = y * cosX - z * sinX; float dz = y * sinX + z * cosX;
-					y = dy; z = dz;
-
-					// Y軸回転
-					float cosY = cosf(t2_Rotate[1]); float sinY = sinf(t2_Rotate[1]);
-					float dx = x * cosY + z * sinY; dz = -x * sinY + z * cosY;
-					x = dx; z = dz;
-
-					// Z軸回転
-					float cosZ = cosf(t2_Rotate[2]); float sinZ = sinf(t2_Rotate[2]);
-					dx = x * cosZ - y * sinZ; dy = x * sinZ + y * cosZ;
-					x = dx; y = dy;
-
-					// 平行移動
-					v.position.x = x + t2_Translate[0];
-					v.position.y = y + t2_Translate[1];
-					v.position.z = z + t2_Translate[2];
-
-					// 計算結果を上書き保存
-					vertexData[i + 3] = v;
-				}
-			} else if (renderingMode == 3) {
-				// 3: 三角錐1個
-				drawVertexCount = 12;
-				VertexData pyramidVertices[12] = {
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
-				};
-				for (uint32_t i = 0; i < drawVertexCount; ++i) {
-					vertexData[i] = pyramidVertices[i];
-				}
-			} else if (renderingMode == 4) {
-				// 4: 三角錐2個 (個別SRT)
-				drawVertexCount = 24;
-				VertexData basePyramid[12] = {
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}}, {{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},
-					{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, {{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}}, {{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},
-				};
-
-				// 1個目の三角錐の変形計算
-				for (uint32_t i = 0; i < 12; ++i) {
-					VertexData v = basePyramid[i];
-					float x = v.position.x * p1_Scale[0];
-					float y = v.position.y * p1_Scale[1];
-					float z = v.position.z * p1_Scale[2];
-					// X軸回転
-					float cosX = cosf(p1_Rotate[0]); float sinX = sinf(p1_Rotate[0]);
-					float dy = y * cosX - z * sinX; float dz = y * sinX + z * cosX;
-					y = dy; z = dz;
-					// Y軸回転
-					float cosY = cosf(p1_Rotate[1]); float sinY = sinf(p1_Rotate[1]);
-					float dx = x * cosY + z * sinY; dz = -x * sinY + z * cosY;
-					x = dx; z = dz;
-					// Z軸回転
-					float cosZ = cosf(p1_Rotate[2]); float sinZ = sinf(p1_Rotate[2]);
-					dx = x * cosZ - y * sinZ; dy = x * sinZ + y * cosZ;
-					x = dx; y = dy;
-					// 平行移動
-					v.position.x = x + p1_Translate[0];
-					v.position.y = y + p1_Translate[1];
-					v.position.z = z + p1_Translate[2];
-					vertexData[i] = v;
-				}
-
-				// 2個目の三角錐の変形計算
-				for (uint32_t i = 0; i < 12; ++i) {
-					VertexData v = basePyramid[i];
-					float x = v.position.x * p2_Scale[0];
-					float y = v.position.y * p2_Scale[1];
-					float z = v.position.z * p2_Scale[2];
-					// X軸回転
-					float cosX = cosf(p2_Rotate[0]); float sinX = sinf(p2_Rotate[0]);
-					float dy = y * cosX - z * sinX; float dz = y * sinX + z * cosX;
-					y = dy; z = dz;
-					// Y軸回転
-					float cosY = cosf(p2_Rotate[1]); float sinY = sinf(p2_Rotate[1]);
-					float dx = x * cosY + z * sinY; dz = -x * sinY + z * cosY;
-					x = dx; z = dz;
-					// Z軸回転
-					float cosZ = cosf(p2_Rotate[2]); float sinZ = sinf(p2_Rotate[2]);
-					dx = x * cosZ - y * sinZ; dy = x * sinZ + y * cosZ;
-					x = dx; y = dy;
-					// 平行移動
-					v.position.x = x + p2_Translate[0];
-					v.position.y = y + p2_Translate[1];
-					v.position.z = z + p2_Translate[2];
-					vertexData[i + 12] = v;
-				}
-			}
-
-#endif
 			// Production Modeだけは既存のParticleSystem用頂点バッファを使用する
 			if (renderingMode == 5) {
 				particleSystem.WriteTriangleVertices(vertexData);
@@ -1906,10 +1699,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			///// ----- 行列の計算 ----- /////
+
 			/// --- ワールド行列の更新 ---
+
+			/*
+
 			worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 
+			*/
+
 			/// --- ビュー行列の更新 ---
+
 			// 選択中のカメラからView行列を取得する
 			const Matrix4x4& viewMatrix =
 				isDebugCameraActive
@@ -1917,6 +1717,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				: camera.GetViewMatrix();
 
 			/// --- プロジェクション行列の更新 ---
+
 			// 選択中のカメラからProjection行列を取得する
 			const Matrix4x4& projectionMatrix =
 				isDebugCameraActive
@@ -1967,6 +1768,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				projectionMatrix);
 
 			/// --- Object3D用WVPを計算する ---
+
+			/*
+
 			// ワールド、ビュー、プロジェクションを掛け合わせる
 			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
 
@@ -1976,6 +1780,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// ライティングで法線を変換するWorld行列を送る
 			wvpData->World = worldMatrix;
+
+			*/
 
 			///// ----- ImGui中身 ----- /////
 #ifdef USE_IMGUI
@@ -1992,208 +1798,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 			ImGui::End();
 
-			// 以前の直書きUIはラッパー移行内容を確認できるよう残す
-#if 0
-			ImGui::Begin("Properties (Legacy)");
-			const char* textureModes[] = {
-				"0 : No Texture (White)",
-				"1 : UV Checker",
-				"2 : Genbaneko"
-			};
-
-			/// --- 色変えれます ---
-			if (selectedObject == SelectedObject::Pyramid) {
-				ImGui::Text("3D Object Material");
-				ImGui::ColorEdit4("Material Color", &materialData->x);
-
-				// 区切り線
-				ImGui::Separator();
-
-				/// --- 画像変えれます ---
-				// テクスチャ切り替え
-				const char* textureModes[] = {
-					"0 : No Texture (White)",
-					"1 : UV Checker",
-					"2 : Genbaneko"
-				};
-
-				ImGui::Combo(
-					"Texture Mode",
-					&textureMode,
-					textureModes,
-					IM_ARRAYSIZE(textureModes)
-				);
-
-				// 区切り線
-				ImGui::Separator();
-			}
-
-			if (selectedObject == SelectedObject::Sprite) {
-
-				///// ----- Sprite ----- /////
-				/// --- Texture ---
-				// 三角形とは別にSpriteのTextureを切り替える
-				ImGui::Text("Sprite Control");
-				ImGui::Combo(
-					"Sprite Texture Mode",
-					&spriteTextureMode,
-					textureModes,
-					IM_ARRAYSIZE(textureModes)
-				);
-
-				/// --- 色 ---
-				// Sprite専用のMaterial Colorを変更する
-				ImGui::ColorEdit4("Sprite Material Color", &sprite2D.GetColor().x);
-
-				/// --- SRT ---
-				// Sprite専用のScale、Rotate、Translateを変更する
-				Transform& spriteTransform = sprite2D.GetTransform();
-				ImGui::DragFloat3("Sprite Scale", &spriteTransform.scale.x, 0.01f);
-				ImGui::DragFloat3("Sprite Rotate", &spriteTransform.rotate.x, 0.01f);
-				ImGui::DragFloat3("Sprite Translate", &spriteTransform.translate.x, 1.0f);
-
-				// Spriteだけを初期状態へ戻す
-				if (ImGui::Button("Reset Sprite")) {
-					sprite2D.Reset();
-				}
-
-				// 区切り線
-				ImGui::Separator();
-			}
-
-			if (selectedObject == SelectedObject::SceneSettings) {
-				/// --- モード切り替えを切り替えだドン ---
-				const char* modes[] = {
-					"0: None",
-					"1: Single Triangle",
-					"2: Double Triangles",
-					"3: Single Pyramid",
-					"4: Double Pyramids",
-					"5: Production Mode"
-				};
-				ImGui::Combo("Display Mode", &displayMode, modes, IM_ARRAYSIZE(modes));
-
-				// モード1(三角形2枚)の個別SRTスライダー
-				if (displayMode == 1) {
-					ImGui::Text("[Triangle 1]");
-					ImGui::SliderFloat3("T1 Scale", t1_Scale, 0.1f, 5.0f);
-					ImGui::SliderFloat3("T1 Rotation", t1_Rotate, -3.1415f, 3.1415f);
-					ImGui::SliderFloat3("T1 Position", t1_Translate, -3.0f, 3.0f);
-
-					ImGui::Separator();
-
-					ImGui::Text("[Triangle 2]");
-					ImGui::SliderFloat3("T2 Scale", t2_Scale, 0.1f, 5.0f);
-					ImGui::SliderFloat3("T2 Rotation", t2_Rotate, -3.1415f, 3.1415f);
-					ImGui::SliderFloat3("T2 Position", t2_Translate, -3.0f, 3.0f);
-
-					ImGui::Separator();
-				}
-
-				// モード3(三角錐2個)の個別SRTスライダー
-				if (displayMode == 3) {
-					ImGui::Text("[Pyramid 1]");
-					ImGui::SliderFloat3("P1 Scale", p1_Scale, 0.1f, 5.0f);
-					ImGui::SliderFloat3("P1 Rotation", p1_Rotate, -3.1415f, 3.1415f);
-					ImGui::SliderFloat3("P1 Position", p1_Translate, -3.0f, 3.0f);
-
-					ImGui::Separator();
-
-					ImGui::Text("[Pyramid 2]");
-					ImGui::SliderFloat3("P2 Scale", p2_Scale, 0.1f, 5.0f);
-					ImGui::SliderFloat3("P2 Rotation", p2_Rotate, -3.1415f, 3.1415f);
-					ImGui::SliderFloat3("P2 Position", p2_Translate, -3.0f, 3.0f);
-
-					ImGui::Separator();
-				}
-
-				// 区切り線
-				ImGui::Separator();
-			}
-
-			if (selectedObject == SelectedObject::Pyramid) {
-				/// --- 自動で回転かと座標変えれます ---
-				ImGui::Text("Pyramid Control");
-				// 上の選択オブジェクト用Transformと表示名が同じでもIDが重ならないようにする
-				ImGui::PushID("PyramidControl");
-
-				// 1_拡縮の変更(XYZ)
-				ImGui::SliderFloat3("Scale", &transform.scale.x, 0.1f, 10.0f);
-
-				// 2_上下左右・奥への位置移動(XYZ)
-				ImGui::SliderFloat3("Position", &transform.translate.x, -5.0f, 5.0f);
-
-				// 3_自動回転の切り替えボタン
-				// ボタンを押すたびにON/OFFが切り替わり、OFFになった瞬間に回転を初期値(0)にリセット
-				if (ImGui::Button(isAutoRotate ? "Stop & Reset" : "Start Auto Rotate")) {
-					isAutoRotate = !isAutoRotate;
-					if (!isAutoRotate) {
-						transform.rotate = {0.0f, 0.0f, 0.0f}; // 回転を初期値に戻す
-					}
-				}
-
-				// 4_フラグの状態確認(0か1かで表示)
-				ImGui::Text("Auto Rotate Flag: %d", isAutoRotate ? 1 : 0);
-
-				// 5_各軸の回転(XYZ)
-				// 自動回転がOFFのときだけ手動でいじれるようにしてONのときは現在の回転角を表示する
-				if (!isAutoRotate) {
-					ImGui::SliderFloat3("Rotation", &transform.rotate.x, -3.1415f, 3.1415f);
-				} else {
-					ImGui::Text("Rotation (Auto): X:%.2f, Y:%.2f, Z:%.2f", transform.rotate.x, transform.rotate.y, transform.rotate.z);
-				}
-
-				// 6_すべてのパラメータをリセット (SRTと自動回転を初期値に戻す)
-				if (ImGui::Button("Reset All")) {
-					// グローバルSRTと自動回転のリセット
-					transform.scale = {1.0f, 1.0f, 1.0f};
-					transform.rotate = {0.0f, 0.0f, 0.0f};
-					transform.translate = {0.0f, 0.0f, 0.0f};
-					isAutoRotate = false;
-
-					// 現在のモードを維持したまま各パラメータをリセット
-					for (int i = 0; i < 3; ++i) {
-						t1_Scale[i] = 1.0f;  t1_Rotate[i] = 0.0f;
-						t2_Scale[i] = 1.0f;  t2_Rotate[i] = 0.0f;
-						p1_Scale[i] = 1.0f;  p1_Rotate[i] = 0.0f;
-						p2_Scale[i] = 1.0f;  p2_Rotate[i] = 0.0f;
-					}
-					// モード1の初期位置
-					t1_Translate[0] = -0.2f; t1_Translate[1] = -0.2f; t1_Translate[2] = 0.0f;
-					t2_Translate[0] = 0.2f;  t2_Translate[1] = 0.2f;  t2_Translate[2] = 0.2f;
-
-					// モード3の初期位置
-					p1_Translate[0] = -0.3f; p1_Translate[1] = 0.0f;  p1_Translate[2] = 0.0f;
-					p2_Translate[0] = 0.3f;  p2_Translate[1] = 0.0f;  p2_Translate[2] = 0.0f;
-
-					// 全Particleを削除して最初の1個を生成する
-					particleSystem.Reset();
-				}
-				ImGui::PopID();
-			}
-
-			if (selectedObject == SelectedObject::ParticleSystem) {
-				ImGui::TextUnformatted("ParticleSystem");
-				ImGui::Separator();
-				ImGui::Text("Particle Count : %d", static_cast<int>(particleSystem.GetParticleCount()));
-				ImGui::Text("Max Particle Count : %d", static_cast<int>(particleSystem.GetMaxParticleCount()));
-				ImGui::Text("Total Vertex Count : %d", static_cast<int>(particleSystem.GetTotalVertexCount()));
-				if (ImGui::Button("Reset Particles")) {
-					// Particleを1個の初期状態へ戻す
-					particleSystem.Reset();
-				}
-				ImGui::TextDisabled("Detailed execution is shown in Particle Flow.");
-			}
-
-			if (selectedObject == SelectedObject::None) {
-				ImGui::TextDisabled("Select an item in Hierarchy.");
-			}
-
-			// 区切り線
-			ImGui::Separator();
-
-			ImGui::End();
-#endif
 #endif // USE_IMGUI
 
 			// ImGuiで変更されたSpriteのSRTからWVPを更新する
@@ -2223,7 +1827,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			// wvp用のBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			// 平行光源をPixel Shaderのb1へ設定する
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 
