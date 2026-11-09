@@ -1643,7 +1643,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// Production Modeだけは既存のParticleSystem用頂点バッファを使用する
 			if (renderingMode == 5) {
-				particleSystem.WriteTriangleVertices(vertexData);
 				particleSystem.Update(deltaTime);
 			}
 
@@ -1795,6 +1794,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				// Production ModeではParticleSystemを描画する
 				particleSystem.Draw(
 					commandList,
+					currentTextureHandle,
 					viewMatrix,
 					projectionMatrix);
 			} else if (isPrimitive3DVisible) {

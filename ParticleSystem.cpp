@@ -41,6 +41,29 @@ void ParticleSystem::Initialize(ID3D12Device* device, float fieldMin, float fiel
 	);
 	assert(SUCCEEDED(hr));
 
+	/// --- 頂点バッファ ---
+
+	// 三角形1枚分の頂点バッファを作成し、頂点を書き込む
+	vertexBuffer_.Initialize(device, kVertexCount);
+	WriteTriangleVertices();
+
+	/// --- マテリアル ---
+
+	// Particle共通のマテリアルを作成する
+	materialResource_ = BufferResource::Create(device, sizeof(Material));
+	hr = materialResource_->Map(
+		0,
+		nullptr,
+		reinterpret_cast<void**>(&materialData_)
+	);
+	assert(SUCCEEDED(hr));
+
+	// 白色、ライティングなし、UVは変化させない
+	materialData_->color = {1.0f, 1.0f, 1.0f, 1.0f};
+	materialData_->enableLighting = false;
+	materialData_->uvTransform = Matrix4x4::MakeIdentity4x4();
+	materialData_->lightingMode = 0;
+
 	particles_.reserve(maxParticleCount_);
 	Reset();
 }
@@ -98,25 +121,47 @@ void ParticleSystem::Update(float deltaTime) {
 /// --- 頂点データ ---
 
 // Particleで使用する三角形の頂点を書き込む
-void ParticleSystem::WriteTriangleVertices(VertexData* vertexData) const {
+void ParticleSystem::WriteTriangleVertices() {
+
+	VertexData* vertexData = vertexBuffer_.GetData();
 	assert(vertexData != nullptr);
 
-	const VertexData triangleVertices[3] = {
+	const VertexData triangleVertices[kVertexCount] = {
 		{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},
 		{{0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}},
 		{{-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}},
 	};
 
-	for (uint32_t i = 0; i < 3; ++i) {
+	for (uint32_t i = 0; i < kVertexCount; ++i) {
 		vertexData[i] = triangleVertices[i];
 	}
 }
 
 /// --- 描画 ---
 
-// ParticleごとのWVPを設定して三角形を描画
-void ParticleSystem::Draw(ID3D12GraphicsCommandList* commandList, const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix) {
+// 頂点バッファ・マテリアル・テクスチャを設定し、ParticleごとのWVPで三角形を描画
+void ParticleSystem::Draw(
+	ID3D12GraphicsCommandList* commandList,
+	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle,
+	const Matrix4x4& viewMatrix,
+	const Matrix4x4& projectionMatrix
+) {
+
 	assert(commandList != nullptr);
+
+	/// --- 全Particle共通の設定 ---
+
+	// Particle専用の頂点バッファを設定する
+	const D3D12_VERTEX_BUFFER_VIEW& vertexBufferView = vertexBuffer_.GetView();
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	// 形状を設定
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	// マテリアルを設定
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
+	// テクスチャを設定
+	commandList->SetGraphicsRootDescriptorTable(2, textureHandle);
+
+	/// --- Particleごとの描画 ---
 
 	for (size_t i = 0; i < particles_.size(); ++i) {
 		const Particle& particle = particles_[i];
@@ -257,8 +302,15 @@ bool ParticleSystem::ReflectAtFieldWall(Particle& particle) {
 
 // Particle用のWVPResourceを解放
 void ParticleSystem::Finalize() {
+
 	particles_.clear();
 	particleWvpData_ = nullptr;
 	// Particle用ResourceはComPtrのデストラクタが自動解放する
 	maxParticleCount_ = 0;
+
+
+	// 頂点バッファを解放する
+	vertexBuffer_.Finalize();
+	// マテリアルのアドレスを無効にする (ResourceはComPtrが自動解放する)
+	materialData_ = nullptr;
 }

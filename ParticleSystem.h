@@ -2,6 +2,8 @@
 
 #include "Matrix4x4.h"
 #include "VertexData.h"
+#include "VertexBuffer.h"
+#include "Material.h"
 #include "TransformationMatrix.h"
 
 #include <d3d12.h>
@@ -52,15 +54,14 @@ public:
 	// 移動、回転、壁反射、Particleの追加を行う (deltaTimeは前のフレームからの経過時間(秒))
 	void Update(float deltaTime);
 
-	/// --- 頂点データ ---
-
-	// Particleで使用する三角形の頂点を書き込む
-	void WriteTriangleVertices(VertexData* vertexData) const;
-
 	/// --- 描画 ---
 
-	// ParticleごとのWVPを設定して三角形を描画
-	void Draw(ID3D12GraphicsCommandList* commandList, const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix);
+	// 頂点バッファ・マテリアル・テクスチャを設定し、ParticleごとのWVPで三角形を描画
+	void Draw(
+		ID3D12GraphicsCommandList* commandList,
+		D3D12_GPU_DESCRIPTOR_HANDLE textureHandle,
+		const Matrix4x4& viewMatrix,
+		const Matrix4x4& projectionMatrix);
 
 	/// --- リセット ---
 
@@ -90,6 +91,11 @@ public:
 	void Finalize();
 
 private:
+	/// --- 頂点データ ---
+
+	// Particleで使用する三角形の頂点を書き込む
+	void WriteTriangleVertices();
+
 	/// --- Particleの生成 ---
 
 	// ランダムな位置、方向、速さ、回転でParticleを作成
@@ -101,6 +107,8 @@ private:
 	bool ReflectAtFieldWall(Particle& particle);
 
 	static constexpr uint32_t kConstantBufferAlignment = 256;
+	// 三角形1枚分の頂点数
+	static constexpr uint32_t kVertexCount = 3;
 
 	std::vector<Particle> particles_;
 	std::mt19937 randomEngine_;
@@ -112,4 +120,10 @@ private:
 	// Particle用ResourceをComPtrで自動解放する
 	Microsoft::WRL::ComPtr<ID3D12Resource> particleWvpResource_;
 	uint8_t* particleWvpData_ = nullptr;
+
+	// 三角形1枚分の頂点バッファ
+	VertexBuffer vertexBuffer_;
+	// Particle共通のマテリアル (寿命をComPtrで管理する)
+	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
+	Material* materialData_ = nullptr;
 };
