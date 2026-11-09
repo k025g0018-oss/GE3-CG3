@@ -374,6 +374,6 @@ imgui.ini
 hlsl
 
 # gitignoreでobjをアップできるようにする
-!resources/**/*.obj
+!project/resources/**/*.obj
 
 generated/
