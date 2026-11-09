@@ -375,3 +375,5 @@ hlsl
 
 # gitignoreでobjをアップできるようにする
 !resources/**/*.obj
+
+generated/
