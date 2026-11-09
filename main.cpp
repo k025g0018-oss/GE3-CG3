@@ -48,6 +48,7 @@
 #include <cmath>
 #include <cstring>
 #include <array>
+#include <numbers>
 
 // COMオブジェクトを自動解放するためにComPtrを使用する
 using Microsoft::WRL::ComPtr;
@@ -392,8 +393,10 @@ void DrawStatistics(
 	bool& isBunnyVisible,
 	bool& isTeapotVisible,
 	bool& isSuzanneVisible,
+	bool& isFenceVisible,
 	bool& isSpriteVisible
 ) {
+
 	ImGui::Begin("Statistics");
 
 	ImGui::Text(
@@ -444,6 +447,7 @@ void DrawStatistics(
 		isBunnyVisible = true;
 		isTeapotVisible = true;
 		isSuzanneVisible = true;
+		isFenceVisible = true;
 		isSpriteVisible = true;
 	}
 
@@ -462,6 +466,7 @@ void DrawStatistics(
 		isBunnyVisible = false;
 		isTeapotVisible = false;
 		isSuzanneVisible = false;
+		isFenceVisible = false;
 		isSpriteVisible = false;
 	}
 
@@ -985,6 +990,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ImGuiを描画するSwapChain側は、実際のウィンドウサイズへ追従させる
 		// ->GraphicsDevice が持っている。
 
+		///// ----- ===== ----- /////
+
 		///// ----- 変数の宣言 ----- /////
 
 		/// --- 三角形・三角錐 ---
@@ -997,12 +1004,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 描画モード
 		int& displayMode = primitive3D.GetDisplayMode();
 
+		///// ----- ===== ----- /////
+
 		///// ----- ParticleSystem ----- /////
 
 		/// --- 初期化 ---
 		// 演出モード4で使用する範囲と最大数を設定する
 		ParticleSystem particleSystem;
 		particleSystem.Initialize(device, -0.9f, 0.9f, 50);
+
+		///// ----- ===== ----- /////
 
 		///// ----- カメラ ----- /////
 		Camera camera;
@@ -1022,6 +1033,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		*/
 
+		///// ----- ===== ----- /////
+
 		///// ----- デバッグカメラ ----- /////
 
 		DebugCamera debugCamera;
@@ -1033,8 +1046,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// falseは通常カメラ、trueはデバッグカメラを使用する
 		bool isDebugCameraActive = false;
 
+		///// ----- ===== ----- /////
 
 		///// ----- 球 (Sphere) ----- /////
+
 		Sphere sphere;
 
 		// ImGuiでは1～32分割まで変更できるようにする
@@ -1044,6 +1059,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		int sphereTextureMode = 3;
 		// Sphereの描画を個別に切り替える
 		bool isSphereVisible = true;
+
+		///// ----- ===== ----- /////
 
 		///// ----- Plane OBJ Model ----- /////
 
@@ -1055,8 +1072,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			"resources/models/plane",
 			"plane.obj");
 
-		// 片面モデルの表側が初期状態でカメラを向くようにする
-		planeModel.GetTransform().rotate.y = 3.141592f;
+		// 片面モデルの表側が初期状態でカメラを向くようにする (Y軸で半回転)
+		planeModel.GetTransform().rotate.y = std::numbers::pi_v<float>;
 
 		// 平面モデルの表示を切り替える
 		bool isPlaneVisible = true;
@@ -1066,6 +1083,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			static_cast<int>(
 				textureManager.FindTextureIndex(
 				planeModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
 
 		///// ----- Axis OBJ Model ----- /////
 
@@ -1085,6 +1104,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			static_cast<int>(
 				textureManager.FindTextureIndex(
 				axisModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
 
 		///// ----- Multi Mesh OBJ Model ----- /////
 
@@ -1108,6 +1129,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				textureManager.FindTextureIndex(
 				multiMeshModel.GetTextureFilePath()));
 
+		///// ----- ===== ----- /////
+
 		///// ----- Multi Material OBJ Model ----- /////
 
 		Model multiMaterialModel;
@@ -1130,6 +1153,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			static_cast<int>(
 				textureManager.FindTextureIndex(
 				multiMaterialModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
 
 		///// ----- Bunny OBJ Model ----- /////
 
@@ -1157,6 +1182,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				textureManager.FindTextureIndex(
 				bunnyModel.GetTextureFilePath()));
 
+		///// ----- ===== ----- /////
 
 		///// ----- Teapot OBJ Model ----- /////
 
@@ -1184,6 +1210,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				textureManager.FindTextureIndex(
 				teapotModel.GetTextureFilePath()));
 
+		///// ----- ===== ----- /////
 
 		///// ----- Suzanne OBJ Model ----- /////
 
@@ -1210,6 +1237,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			static_cast<int>(
 				textureManager.FindTextureIndex(
 				suzanneModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Fence OBJ Model ----- /////
+
+		Model fenceModel;
+
+		// resources/models/fenceフォルダのfence.objを読み込む
+		fenceModel.Initialize(
+			device,
+			"resources/models/fence",
+			"fence.obj");
+
+		// 片面モデルの表側が初期状態でカメラを向くようにする (Y軸で半回転)
+		fenceModel.GetTransform().rotate.y = std::numbers::pi_v<float>;
+
+		// Fenceモデルの表示を切り替える
+		bool isFenceVisible = true;
+
+		// fence.mtlで指定されたテクスチャ番号を取得する
+		int fenceTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				fenceModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
 
 		///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
@@ -1299,6 +1352,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			suzanneTextureMode,
 			isSuzanneVisible);
 
+		// FenceをHierarchyとPropertiesへ接続する
+		ModelEditorObject fenceModelEditor(
+			fenceModel,
+			"Fence Model",
+			fenceTextureMode,
+			isFenceVisible);
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1317,6 +1377,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&bunnyModelEditor,
 			&teapotModelEditor,
 			&suzanneModelEditor,
+			&fenceModelEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1402,6 +1463,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					isAllLightingEnabled);
 				suzanneModel.SetLightingEnabled(
 					isAllLightingEnabled);
+				fenceModel.SetLightingEnabled(
+					isAllLightingEnabled);
 
 				// ONにしたときは選択中の方式も全体へ適用する
 				if (isAllLightingEnabled) {
@@ -1423,6 +1486,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					teapotModel.GetLightingMode() =
 						allLightingMode;
 					suzanneModel.GetLightingMode() =
+						allLightingMode;
+					fenceModel.GetLightingMode() =
 						allLightingMode;
 				}
 			}
@@ -1573,6 +1638,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				isBunnyVisible,
 				isTeapotVisible,
 				isSuzanneVisible,
+				isFenceVisible,
 				isSpriteVisible);
 			DrawFlowGraph(particleSystem, primitive3D);
 
@@ -1712,6 +1778,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// Suzanne専用のWVPを更新する
 			suzanneModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// Fence専用のWVPを更新する
+			fenceModel.Update(
 				viewMatrix,
 				projectionMatrix);
 
@@ -1914,7 +1985,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					suzanneTextureHandle);
 			}
 
+			/// --- Fenceモデル描画 ---
+
+			if (isFenceVisible) {
+				// fence.pngなどImGuiで選択されたTextureをFenceへ設定する
+				const D3D12_GPU_DESCRIPTOR_HANDLE fenceTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(
+						fenceTextureMode));
+
+				fenceModel.Draw(
+					commandList,
+					fenceTextureHandle);
+			}
+
 			/// --- Texture ---
+
 			// 三角形とは別に選択されたTextureを取得する
 			if (isSpriteVisible) {
 				// 表示中だけ選択されたTextureでSpriteを描画する

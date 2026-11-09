@@ -11,7 +11,8 @@ const char* kTextureModes[] = {
 	"1 : UV Checker",
 	"2 : Genbaneko",
 	"3 : Monster Ball",
-	"4 : Checker Board"
+	"4 : Checker Board",
+	"5 : Fence"
 };
 }
 
