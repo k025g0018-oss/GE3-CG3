@@ -1,0 +1,2094 @@
+#include "Matrix4x4.h"
+#include "Primitive3D.h"
+#include "Vector.h"
+#include "Collision.h"
+#include "CommandContext.h"
+#include "DepthStencilView.h"
+#include "DescriptorHeap.h"
+#include "EditorObject.h"
+#include "Logger.h"
+#include "ParticleSystem.h"
+#include "PipelineState.h"
+#include "SceneRenderTexture.h"
+#include "Sprite.h"
+#include "TextureManager.h"
+#include "VertexBuffer.h"
+#include "Sphere.h"
+#include "Camera.h"
+#include "TransformationMatrix.h"
+#include "DirectionalLight.h"
+#include "Material.h"
+#include "ModelLoader.h"
+#include "Model.h"
+#include "Audio.h"
+#include "DirectInput.h"
+#include "DebugCamera.h"
+#include "Window.h"
+#include "GraphicsDevice.h"
+#include "D3DResourceLeakChecker.h"
+
+#include <cstdint> // int32_t
+#include <string> // 文字列
+#include <format>
+#include <filesystem> // ファイルやディレクトリに関する操作を行うライブラリ
+#include <fstream> // ファイルに書いたり読んだりするライブラリ
+#include <chrono> // 時間を扱うライブラリ
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <cassert>
+#include <dbghelp.h> // Debug用のあれやこれやを使えるようにする
+#include <strsafe.h> // StringCchPrintfWの利用に必要
+#include <dxgidebug.h>
+#include <dxcapi.h>
+#include <wrl.h>
+#include <filesystem> // フォルダとファイルを列挙するため
+#include <string>     // ファイル名をstd::stringで扱うため
+#include <system_error> // フォルダ列挙エラーを安全に受け取るため
+#include <vector> // ImGuiが使用するSRV番号を管理するため
+#include <cmath>
+#include <cstring>
+#include <array>
+#include <numbers>
+
+// COMオブジェクトを自動解放するためにComPtrを使用する
+using Microsoft::WRL::ComPtr;
+
+// ImGui
+#ifdef USE_IMGUI
+#include "externals/imgui/imgui.h"
+#include "externals/imgui/imgui_internal.h"
+#include "externals/imgui/imgui_impl_dx12.h"
+#include "externals/imgui/imgui_impl_win32.h"
+#endif // USE_IMGUI
+
+// libのリンク
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "Dbghelp.lib") // Debug用のあれやこれやを使えるようにする
+#pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "dxcompiler.lib")
+#pragma comment(lib, "DirectXTex.lib")
+
+///// ----- 関数の定義エリア ----- /////
+
+#pragma region
+
+// CrashHandlerの登録
+static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
+	// Dumpを出力する
+	// 時刻を取得して、時刻を名前に入れたファイルを作成。Dumpsディレクトリ以下に出力
+	SYSTEMTIME time;
+	GetLocalTime(&time);
+	wchar_t filePath[MAX_PATH] = {0};
+	CreateDirectory(L"./Dumps", nullptr);
+	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d%02d-%02d%02d.dmp",
+		time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute);
+	HANDLE dumpFileHandle = CreateFile(filePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
+	// processId(このexeのId)とクラッシュ(例外)の発生したthreadIdを取得
+	DWORD processId = GetCurrentProcessId();
+	DWORD threadId = GetCurrentThreadId();
+	// 設定情報を入力
+	MINIDUMP_EXCEPTION_INFORMATION minidumpInformation{0};
+	minidumpInformation.ThreadId = threadId;
+	minidumpInformation.ExceptionPointers = exception;
+	minidumpInformation.ClientPointers = TRUE;
+	// Dumpを出力。MiniDumpNormalは最低限の情報を出力するフラグ
+	MiniDumpWriteDump(GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal, &minidumpInformation, nullptr, nullptr);
+	// 他に関連付けられているSEH例外ハンドラがあれば実行。通常はプロセスを終了する。
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
+///// ----- ImGuiパネル ----- /////
+
+#ifdef USE_IMGUI
+// Hierarchyで現在選択されている項目を表す
+// Hierarchyの選択は共通ラッパーのポインターで管理する
+
+// 起動時にViewportの比率からDock配置を作り、ウィンドウサイズ変更にも追従させる
+void SetupDefaultDockLayout(ImGuiID dockspaceId, const ImVec2& viewportSize) {
+	ImGui::DockBuilderRemoveNode(dockspaceId);
+	ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+	ImGui::DockBuilderSetNodeSize(dockspaceId, viewportSize);
+
+	ImGuiID centerDockId = dockspaceId;
+	ImGuiID leftDockId = 0;
+	ImGuiID rightDockId = 0;
+	ImGuiID bottomDockId = 0;
+
+	// 左18%、右22%、下25%を補助パネルとして確保し、中央をSceneにする
+	ImGui::DockBuilderSplitNode(centerDockId, ImGuiDir_Left, 0.18f, &leftDockId, &centerDockId);
+	ImGui::DockBuilderSplitNode(centerDockId, ImGuiDir_Right, 0.22f, &rightDockId, &centerDockId);
+	ImGui::DockBuilderSplitNode(centerDockId, ImGuiDir_Down, 0.25f, &bottomDockId, &centerDockId);
+
+	ImGuiID leftBottomDockId = 0;
+	ImGuiID rightBottomDockId = 0;
+	ImGui::DockBuilderSplitNode(leftDockId, ImGuiDir_Down, 0.50f, &leftBottomDockId, &leftDockId);
+	ImGui::DockBuilderSplitNode(rightDockId, ImGuiDir_Down, 0.50f, &rightBottomDockId, &rightDockId);
+
+	ImGui::DockBuilderDockWindow("Hierarchy", leftDockId);
+	ImGui::DockBuilderDockWindow("Flow Graph", leftBottomDockId);
+	ImGui::DockBuilderDockWindow("Scene", centerDockId);
+	ImGui::DockBuilderDockWindow("Content Browser", bottomDockId);
+	ImGui::DockBuilderDockWindow("Properties", rightDockId);
+	ImGui::DockBuilderDockWindow("Statistics", rightBottomDockId);
+	ImGui::DockBuilderFinish(dockspaceId);
+}
+
+// 選択結果をPropertiesへ渡せるように参照で受け取る
+void DrawHierarchy(const std::vector<IEditorObject*>& editorObjects, IEditorObject*& selectedObject) {
+	ImGui::Begin("Hierarchy");
+	for (IEditorObject* editorObject : editorObjects) {
+		// ラッパーを一覧へ追加するだけでHierarchyにも反映される
+		if (ImGui::Selectable(editorObject->GetName(), selectedObject == editorObject)) {
+			selectedObject = editorObject;
+		}
+	}
+	ImGui::End();
+}
+
+// Scene用レンダーテクスチャをパネル内へ表示する カメラ操作
+bool DrawScene(
+	D3D12_GPU_DESCRIPTOR_HANDLE sceneSrvHandle,
+	const IEditorObject* selectedObject
+) {
+	ImGui::Begin("Scene");
+
+	ImGui::Text(
+		"Selected : %s",
+		selectedObject
+		? selectedObject->GetName()
+		: "None"
+	);
+
+	const ImVec2 panelSize =
+		ImGui::GetContentRegionAvail();
+
+	if (panelSize.x > 0.0f &&
+		panelSize.y > 0.0f) {
+
+		const ImTextureRef sceneTexture(
+			static_cast<ImTextureID>(
+			sceneSrvHandle.ptr
+		)
+		);
+
+		ImGui::Image(
+			sceneTexture,
+			panelSize
+		);
+	}
+
+	// Sceneウィンドウ上だけカメラ操作を有効にする
+	const bool isSceneHovered =
+		ImGui::IsWindowHovered(
+			ImGuiHoveredFlags_AllowWhenBlockedByActiveItem
+		);
+
+	ImGui::End();
+
+	return isSceneHovered;
+}
+
+// Particle Flow内の1ノードを描画する
+void DrawParticleFlowNode(
+	ImDrawList* drawList,
+	const ImVec2& position,
+	const ImVec2& size,
+	const char* label,
+	bool active,
+	bool eventActive = false
+) {
+	const ImU32 backgroundColor = eventActive
+		? IM_COL32(205, 115, 35, 255)
+		: active ? IM_COL32(50, 145, 90, 255) : IM_COL32(55, 60, 70, 255);
+	const ImU32 borderColor = active || eventActive
+		? IM_COL32(245, 245, 245, 255)
+		: IM_COL32(105, 110, 120, 255);
+
+	drawList->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), backgroundColor, 7.0f);
+	drawList->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), borderColor, 7.0f, 0, 2.0f);
+	const ImVec2 textSize = ImGui::CalcTextSize(label);
+	drawList->AddText(
+		ImVec2(position.x + (size.x - textSize.x) * 0.5f, position.y + (size.y - textSize.y) * 0.5f),
+		IM_COL32(255, 255, 255, 255),
+		label
+	);
+}
+
+// ノード間の処理順を矢印で描画する
+void DrawParticleFlowArrow(ImDrawList* drawList, const ImVec2& from, const ImVec2& to, bool active) {
+	const ImU32 color = active ? IM_COL32(95, 225, 140, 255) : IM_COL32(115, 120, 130, 255);
+	drawList->AddLine(from, to, color, active ? 3.0f : 2.0f);
+	const float direction = to.x >= from.x ? 1.0f : -1.0f;
+	drawList->AddTriangleFilled(
+		to,
+		ImVec2(to.x - 8.0f * direction, to.y - 5.0f),
+		ImVec2(to.x - 8.0f * direction, to.y + 5.0f),
+		color
+	);
+}
+
+// ParticleSystemの実行順と直近イベントを読み取り専用で可視化する
+void DrawParticleFlow(const ParticleSystem& particleSystem) {
+	ImGui::Begin("Particle Flow");
+	const ParticleSystem::DebugFlowState& state = particleSystem.GetDebugFlowState();
+
+	ImGui::Text(
+		"Particles : %d / %d",
+		static_cast<int>(particleSystem.GetParticleCount()),
+		static_cast<int>(particleSystem.GetMaxParticleCount())
+	);
+	ImGui::Text("Collision : %u    Spawn : %u", state.collisionCount, state.spawnCount);
+	ImGui::Text(
+		"Last Event : %s",
+		state.resetOccurred ? "Reset" : state.spawnCount > 0 ? "Spawn" : state.collisionCount > 0 ? "Collision" : "Update"
+	);
+	ImGui::Separator();
+
+	const ImVec2 canvasStart = ImGui::GetCursorScreenPos();
+	const ImVec2 nodeSize(125.0f, 44.0f);
+	const float gap = 32.0f;
+	const float rowGap = 52.0f;
+	const ImVec2 updatePos = canvasStart;
+	const ImVec2 movePos(updatePos.x + nodeSize.x + gap, updatePos.y);
+	const ImVec2 collisionPos(movePos.x + nodeSize.x + gap, movePos.y);
+	const ImVec2 reflectPos(collisionPos.x + nodeSize.x + gap, collisionPos.y);
+	const ImVec2 spawnPos(reflectPos.x, reflectPos.y + nodeSize.y + rowGap);
+	const ImVec2 maxCheckPos(collisionPos.x, spawnPos.y);
+	const ImVec2 resetPos(movePos.x, spawnPos.y);
+
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	DrawParticleFlowArrow(drawList, ImVec2(updatePos.x + nodeSize.x, updatePos.y + 22.0f), ImVec2(movePos.x, movePos.y + 22.0f), state.moveExecuted);
+	DrawParticleFlowArrow(drawList, ImVec2(movePos.x + nodeSize.x, movePos.y + 22.0f), ImVec2(collisionPos.x, collisionPos.y + 22.0f), state.collisionChecked);
+	DrawParticleFlowArrow(drawList, ImVec2(collisionPos.x + nodeSize.x, collisionPos.y + 22.0f), ImVec2(reflectPos.x, reflectPos.y + 22.0f), state.collisionCount > 0);
+	DrawParticleFlowArrow(drawList, ImVec2(reflectPos.x + nodeSize.x * 0.5f, reflectPos.y + nodeSize.y), ImVec2(spawnPos.x + nodeSize.x * 0.5f, spawnPos.y), state.spawnCount > 0);
+	DrawParticleFlowArrow(drawList, ImVec2(spawnPos.x, spawnPos.y + 22.0f), ImVec2(maxCheckPos.x + nodeSize.x, maxCheckPos.y + 22.0f), state.updateExecuted);
+	DrawParticleFlowArrow(drawList, ImVec2(maxCheckPos.x, maxCheckPos.y + 22.0f), ImVec2(resetPos.x + nodeSize.x, resetPos.y + 22.0f), state.resetOccurred);
+
+	DrawParticleFlowNode(drawList, updatePos, nodeSize, "1. Update", state.updateExecuted);
+	DrawParticleFlowNode(drawList, movePos, nodeSize, "2. Move / Rotate", state.moveExecuted);
+	DrawParticleFlowNode(drawList, collisionPos, nodeSize, "3. Wall Check", state.collisionChecked);
+	DrawParticleFlowNode(drawList, reflectPos, nodeSize, "4. Reflect", state.collisionCount > 0, state.collisionCount > 0);
+	DrawParticleFlowNode(drawList, spawnPos, nodeSize, "5. Spawn", state.spawnCount > 0, state.spawnCount > 0);
+	DrawParticleFlowNode(drawList, maxCheckPos, nodeSize, "6. Max Check", state.updateExecuted);
+	DrawParticleFlowNode(drawList, resetPos, nodeSize, "7. Reset", state.resetOccurred, state.resetOccurred);
+
+	ImGui::Dummy(ImVec2((nodeSize.x + gap) * 4.0f, nodeSize.y * 2.0f + rowGap + 10.0f));
+	ImGui::End();
+}
+
+// ノードをInvisibleButtonとして登録し、ドラッグ操作で位置を更新する
+void DrawDraggableNode(const char* id, const char* label, ImVec2& position, bool active) {
+	const ImVec2 nodeSize(135.0f, 46.0f);
+	ImGui::SetCursorScreenPos(position);
+	ImGui::PushID(id);
+	ImGui::InvisibleButton("Node", nodeSize);
+	if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+		position.x += ImGui::GetIO().MouseDelta.x;
+		position.y += ImGui::GetIO().MouseDelta.y;
+	}
+	const ImU32 color = active ? IM_COL32(45, 145, 90, 255) : IM_COL32(55, 60, 70, 255);
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	drawList->AddRectFilled(position, ImVec2(position.x + nodeSize.x, position.y + nodeSize.y), color, 7.0f);
+	drawList->AddRect(position, ImVec2(position.x + nodeSize.x, position.y + nodeSize.y), IM_COL32(220, 220, 225, 255), 7.0f, 0, 2.0f);
+	const ImVec2 textSize = ImGui::CalcTextSize(label);
+	drawList->AddText(ImVec2(position.x + (nodeSize.x - textSize.x) * 0.5f, position.y + 14.0f), IM_COL32_WHITE, label);
+	ImGui::PopID();
+}
+
+void DrawFlowConnection(const ImVec2& fromNode, const ImVec2& toNode, bool active) {
+	const ImVec2 nodeSize(135.0f, 46.0f);
+	DrawParticleFlowArrow(
+		ImGui::GetWindowDrawList(),
+		ImVec2(fromNode.x + nodeSize.x, fromNode.y + nodeSize.y * 0.5f),
+		ImVec2(toNode.x, toNode.y + nodeSize.y * 0.5f), active);
+}
+
+void DrawFlowGraph(const ParticleSystem& particleSystem, const Primitive3D& primitive3D) {
+	ImGui::Begin("Flow Graph");
+	ImGui::TextDisabled("Drag nodes with the left mouse button. Connections visualize processing order.");
+	if (ImGui::BeginTabBar("FlowTabs")) {
+		if (ImGui::BeginTabItem("ParticleSystem")) {
+			const ImVec2 origin = ImGui::GetCursorScreenPos();
+			static ImVec2 positions[] = {{20, 35}, {190, 35}, {360, 35}, {530, 35}, {530, 125}, {360, 125}, {190, 125}};
+			ImVec2 p[7];
+			for (int i = 0; i < 7; ++i) {
+				p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y);
+			}
+			const auto& state = particleSystem.GetDebugFlowState();
+			DrawDraggableNode("ParticleUpdate", "1. Update", p[0], state.updateExecuted);
+			DrawDraggableNode("ParticleMove", "2. Move / Rotate", p[1], state.moveExecuted);
+			DrawDraggableNode("ParticleWall", "3. Wall Check", p[2], state.collisionChecked);
+			DrawDraggableNode("ParticleReflect", "4. Reflect", p[3], state.collisionCount > 0);
+			DrawDraggableNode("ParticleSpawn", "5. Spawn", p[4], state.spawnCount > 0);
+			DrawDraggableNode("ParticleMax", "6. Max Check", p[5], state.updateExecuted);
+			DrawDraggableNode("ParticleReset", "7. Reset", p[6], state.resetOccurred);
+			for (int i = 0; i < 7; ++i) {
+				positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y);
+			}
+			for (int i = 0; i < 6; ++i) {
+				DrawFlowConnection(p[i], p[i + 1], i < 2 ? state.updateExecuted : state.collisionCount > 0);
+			}
+			ImGui::Dummy(ImVec2(700.0f, 210.0f));
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("3D Object")) {
+			const ImVec2 origin = ImGui::GetCursorScreenPos();
+			static ImVec2 positions[] = {{20, 55}, {190, 55}, {360, 55}, {530, 55}};
+			ImVec2 p[4];
+			for (int i = 0; i < 4; ++i) {
+				p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y);
+			}
+			DrawDraggableNode("ObjectDisplay", "Display", p[0], true);
+			DrawDraggableNode("ObjectStart", "Start", p[1], primitive3D.IsPlaying());
+			DrawDraggableNode("ObjectMove", "Move / Rotate", p[2], primitive3D.IsPlaying());
+			DrawDraggableNode("ObjectStop", "Stop", p[3], !primitive3D.IsPlaying());
+			for (int i = 0; i < 4; ++i) {
+				positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y);
+			}
+			DrawFlowConnection(p[0], p[1], true);
+			DrawFlowConnection(p[1], p[2], primitive3D.IsPlaying());
+			DrawFlowConnection(p[2], p[3], !primitive3D.IsPlaying());
+			ImGui::Dummy(ImVec2(700.0f, 160.0f));
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("2D Sprite")) {
+			const ImVec2 origin = ImGui::GetCursorScreenPos();
+			static ImVec2 positions[] = {{20, 55}, {210, 55}, {400, 55}};
+			ImVec2 p[3];
+			for (int i = 0; i < 3; ++i) {
+				p[i] = ImVec2(origin.x + positions[i].x, origin.y + positions[i].y);
+			}
+			DrawDraggableNode("SpriteInitialize", "Initialize", p[0], true);
+			DrawDraggableNode("SpriteUpdate", "Update", p[1], true);
+			DrawDraggableNode("SpriteDraw", "Draw / Display", p[2], true);
+			for (int i = 0; i < 3; ++i) {
+				positions[i] = ImVec2(p[i].x - origin.x, p[i].y - origin.y);
+			}
+			DrawFlowConnection(p[0], p[1], true);
+			DrawFlowConnection(p[1], p[2], true);
+			ImGui::Dummy(ImVec2(600.0f, 160.0f));
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
+	ImGui::End();
+}
+
+// 描画統計を表示する
+void DrawStatistics(
+	const std::string& adapterName,
+	FrameRateController& frameRateController,
+	const ParticleSystem& particleSystem,
+	Camera& camera,
+	DebugCamera& debugCamera,
+	bool& isPrimitive3DVisible,
+	bool& isParticleVisible,
+	bool& isSphereVisible,
+	bool& isPlaneVisible,
+	bool& isAxisVisible,
+	bool& isMultiMeshVisible,
+	bool& isMultiMaterialVisible,
+	bool& isBunnyVisible,
+	bool& isTeapotVisible,
+	bool& isSuzanneVisible,
+	bool& isFenceVisible,
+	bool& isSpriteVisible
+) {
+
+	ImGui::Begin("Statistics");
+
+	ImGui::Text(
+		"FPS : %.1f",
+		ImGui::GetIO().Framerate
+	);
+
+	// 前のフレームからの経過時間 (ミリ秒)
+	ImGui::Text("DeltaTime : %.2f ms", frameRateController.GetDeltaTime() * 1000.0f);
+
+	// FPS固定のオンオフ (オフにするとVSyncのみ = モニターのHzで動く)
+	bool isFixFPS = frameRateController.IsFixFPS();
+	if (ImGui::Checkbox("Fix 60FPS", &isFixFPS)) {
+		frameRateController.SetFixFPS(isFixFPS);
+	}
+
+	ImGui::Text(
+		"GPU : %s",
+		adapterName.c_str()
+	);
+
+	ImGui::Text(
+		"Particle Count : %d",
+		static_cast<int>(
+		particleSystem.GetParticleCount()
+	)
+	);
+
+	ImGui::Text(
+		"Total Vertex Count : %d",
+		static_cast<int>(
+		particleSystem.GetTotalVertexCount()
+	)
+	);
+
+	ImGui::Separator();
+
+	// すべての個別Drawを有効にする
+	if (ImGui::Button("Show All Objects")) {
+		isPrimitive3DVisible = true;
+		isParticleVisible = true;
+		isSphereVisible = true;
+		isPlaneVisible = true;
+		isAxisVisible = true;
+		isMultiMeshVisible = true;
+		isMultiMaterialVisible = true;
+		// 追加したOBJモデルも一括表示の対象にする
+		isBunnyVisible = true;
+		isTeapotVisible = true;
+		isSuzanneVisible = true;
+		isFenceVisible = true;
+		isSpriteVisible = true;
+	}
+
+	ImGui::SameLine();
+
+	// すべての個別Drawを無効にする
+	if (ImGui::Button("Hide All Objects")) {
+		isPrimitive3DVisible = false;
+		isParticleVisible = false;
+		isSphereVisible = false;
+		isPlaneVisible = false;
+		isAxisVisible = false;
+		isMultiMeshVisible = false;
+		isMultiMaterialVisible = false;
+		// 追加したOBJモデルも一括非表示の対象にする
+		isBunnyVisible = false;
+		isTeapotVisible = false;
+		isSuzanneVisible = false;
+		isFenceVisible = false;
+		isSpriteVisible = false;
+	}
+
+	ImGui::Separator();
+
+	// Cameraは頻繁に確認するためStatisticsへ常時表示する
+	ImGui::TextUnformatted("Camera");
+
+	Transform& cameraTransform =
+		camera.GetTransform();
+
+	ImGui::DragFloat3(
+		"Camera Translate",
+		&cameraTransform.translate.x,
+		0.01f
+	);
+
+	ImGui::DragFloat3(
+		"Camera Rotate",
+		&cameraTransform.rotate.x,
+		0.01f
+	);
+
+	if (ImGui::Button("Reset Camera")) {
+		camera.Reset();
+	}
+
+	ImGui::TextDisabled(
+		"Scene Left Drag : Rotate"
+	);
+	ImGui::TextDisabled(
+		"Scene Right Drag : Move"
+	);
+	ImGui::TextDisabled(
+		"Scene Wheel : Zoom"
+	);
+
+	ImGui::Separator();
+
+	// ピボット回転を行うDebugCamera専用の操作欄
+	ImGui::TextUnformatted("Debug Camera");
+
+	if (ImGui::Button("Reset Debug Camera")) {
+		// 累積回転、回転中心、距離を初期状態へ戻す
+		debugCamera.Reset();
+	}
+
+	ImGui::TextDisabled(
+		"Pivot Target : World Origin"
+	);
+
+	ImGui::End();
+}
+
+// 指定されたフォルダの中身だけを再帰的に表示する
+void DrawDirectoryTree(const std::filesystem::path& directory) {
+	std::error_code error;
+
+	for (const auto& entry :
+		std::filesystem::directory_iterator(directory, error)) {
+
+		if (error) {
+			ImGui::Text("Failed to read directory.");
+			return;
+		}
+
+		const std::string name = entry.path().filename().string();
+
+		if (entry.is_directory()) {
+			// フォルダをツリーとして開閉可能にする
+			if (ImGui::TreeNode(name.c_str())) {
+				DrawDirectoryTree(entry.path());
+				ImGui::TreePop();
+			}
+		} else {
+			// ファイルを選択可能な項目として表示する
+			ImGui::Selectable(name.c_str());
+		}
+	}
+}
+
+// Content Browserウィンドウは毎フレーム1回だけ作る
+void DrawContentBrowser() {
+	ImGui::Begin("Content Browser");
+
+	const std::filesystem::path resourceDirectory = "resources";
+
+	if (std::filesystem::exists(resourceDirectory)) {
+		DrawDirectoryTree(resourceDirectory);
+	} else {
+		ImGui::Text("resources folder was not found.");
+	}
+
+	ImGui::End();
+}
+
+// TextureManagerへ読み込み済みのPNGなら、対応するSRVを返す
+bool TryGetLoadedTexture(
+	const std::filesystem::path& path,
+	const TextureManager& textureManager,
+	D3D12_GPU_DESCRIPTOR_HANDLE& srvHandle
+) {
+	const std::string fileName = path.filename().string();
+	if (fileName == "white.png") {
+		srvHandle = textureManager.GetSrvHandle(0);
+		return true;
+	}
+	if (fileName == "uvChecker.png") {
+		srvHandle = textureManager.GetSrvHandle(1);
+		return true;
+	}
+	if (fileName == "genbaneko.png") {
+		srvHandle = textureManager.GetSrvHandle(2);
+		return true;
+	}
+	return false;
+}
+
+// 拡張子に合わせた紙アイコンをDear ImGuiの図形で描く
+void DrawDocumentIcon(const char* id, const char* text, ImU32 color, const ImVec2& size) {
+	ImGui::InvisibleButton(id, size);
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	const ImVec2 min = ImGui::GetItemRectMin();
+	const ImVec2 max = ImGui::GetItemRectMax();
+	const float foldSize = size.x * 0.24f;
+
+	drawList->AddRectFilled(min, max, color, 5.0f);
+	drawList->AddTriangleFilled(
+		ImVec2(max.x - foldSize, min.y),
+		ImVec2(max.x, min.y + foldSize),
+		ImVec2(max.x - foldSize, min.y + foldSize),
+		IM_COL32(235, 235, 235, 255)
+	);
+
+	const ImVec2 textSize = ImGui::CalcTextSize(text);
+	drawList->AddText(
+		ImVec2(min.x + (size.x - textSize.x) * 0.5f, min.y + (size.y - textSize.y) * 0.58f),
+		IM_COL32(255, 255, 255, 255),
+		text
+	);
+}
+
+// フォルダまたはファイルの種類に合ったアイコンを表示する
+bool DrawContentBrowserIcon(
+	const std::filesystem::directory_entry& entry,
+	const TextureManager& textureManager,
+	const ImVec2& iconSize
+) {
+	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle{};
+	if (!entry.is_directory() && TryGetLoadedTexture(entry.path(), textureManager, textureHandle)) {
+		const ImTextureRef texture(static_cast<ImTextureID>(textureHandle.ptr));
+		return ImGui::ImageButton("##TextureThumbnail", texture, iconSize);
+	}
+
+	const std::string extension = entry.path().extension().string();
+	if (entry.is_directory()) {
+		DrawDocumentIcon("##FolderIcon", "DIR", IM_COL32(210, 160, 45, 255), iconSize);
+	} else if (extension == ".h" || extension == ".hpp") {
+		DrawDocumentIcon("##HeaderIcon", "H", IM_COL32(70, 130, 210, 255), iconSize);
+	} else if (extension == ".cpp") {
+		DrawDocumentIcon("##CppIcon", "C++", IM_COL32(80, 95, 180, 255), iconSize);
+	} else if (extension == ".hlsl" || extension == ".hlsli") {
+		DrawDocumentIcon("##ShaderIcon", "HLSL", IM_COL32(145, 75, 180, 255), iconSize);
+	} else if (extension == ".png") {
+		DrawDocumentIcon("##PngIcon", "PNG", IM_COL32(75, 155, 100, 255), iconSize);
+	} else {
+		DrawDocumentIcon("##FileIcon", "FILE", IM_COL32(105, 110, 120, 255), iconSize);
+	}
+	return ImGui::IsItemClicked();
+}
+
+// ソリューション内のフォルダとファイルを、アイコン付きで表示する
+void DrawContentBrowserAssets(const TextureManager& textureManager) {
+	ImGui::Begin("Content Browser");
+
+	static std::filesystem::path currentDirectory = ".";
+	static std::filesystem::path selectedPath;
+
+	if (ImGui::Button("Up") && currentDirectory != ".") {
+		currentDirectory = currentDirectory.parent_path();
+		if (currentDirectory.empty()) {
+			currentDirectory = ".";
+		}
+	}
+	ImGui::SameLine();
+	const std::string currentPathText = currentDirectory.lexically_normal().string();
+	ImGui::TextUnformatted(currentPathText.c_str());
+	ImGui::Separator();
+
+	const float previewWidth = 230.0f;
+	ImGui::BeginChild("ContentFiles", ImVec2(-previewWidth, 0.0f), ImGuiChildFlags_Borders);
+
+	std::error_code error;
+	std::vector<std::filesystem::directory_entry> entries;
+	for (const auto& entry : std::filesystem::directory_iterator(currentDirectory, error)) {
+		entries.push_back(entry);
+	}
+
+	if (error) {
+		ImGui::Text("Failed to read directory.");
+	} else {
+		const float tileWidth = 110.0f;
+		const ImVec2 iconSize(72.0f, 72.0f);
+		const int columnCount = static_cast<int>(ImGui::GetContentRegionAvail().x / tileWidth);
+		const int safeColumnCount = columnCount > 0 ? columnCount : 1;
+		int column = 0;
+
+		for (const auto& entry : entries) {
+			const std::string fullPath = entry.path().string();
+			const std::string fileName = entry.path().filename().string();
+			ImGui::PushID(fullPath.c_str());
+			ImGui::BeginGroup();
+
+			const bool clicked = DrawContentBrowserIcon(entry, textureManager, iconSize);
+			if (clicked) {
+				selectedPath = entry.path();
+			}
+			if (entry.is_directory() && ImGui::IsItemHovered() &&
+				ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+				currentDirectory = entry.path();
+				selectedPath.clear();
+			}
+
+			ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tileWidth - 8.0f);
+			ImGui::TextWrapped("%s", fileName.c_str());
+			ImGui::PopTextWrapPos();
+			ImGui::EndGroup();
+			ImGui::PopID();
+
+			++column;
+			if (column < safeColumnCount) {
+				ImGui::SameLine();
+			} else {
+				column = 0;
+			}
+		}
+	}
+	ImGui::EndChild();
+
+	ImGui::SameLine();
+	ImGui::BeginChild("ContentPreview", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
+	ImGui::TextUnformatted("Preview");
+	ImGui::Separator();
+	if (!selectedPath.empty()) {
+		const std::string selectedName = selectedPath.filename().string();
+		const std::string selectedExtension = selectedPath.extension().string();
+		ImGui::TextWrapped("%s", selectedName.c_str());
+		ImGui::TextDisabled("%s", selectedExtension.c_str());
+
+		D3D12_GPU_DESCRIPTOR_HANDLE textureHandle{};
+		if (TryGetLoadedTexture(selectedPath, textureManager, textureHandle)) {
+			const ImTextureRef texture(static_cast<ImTextureID>(textureHandle.ptr));
+			const float imageWidth = ImGui::GetContentRegionAvail().x;
+			ImGui::Image(texture, ImVec2(imageWidth, imageWidth));
+		} else {
+			ImGui::Spacing();
+			const std::string previewText = selectedExtension.empty() ? "DIR" : selectedExtension;
+			DrawDocumentIcon(
+				"##PreviewIcon",
+				previewText.c_str(),
+				IM_COL32(90, 110, 150, 255),
+				ImVec2(96.0f, 96.0f)
+			);
+		}
+	}
+	ImGui::EndChild();
+
+	ImGui::End();
+}
+
+#endif
+
+#pragma endregion 関数の定義エリア
+
+///// ----- メイン処理 ----- /////
+
+// windowsアプリでのエントリーポイント(main関数)
+int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+
+	{
+		// 最初に生成し、ほかのローカル変数より最後にデストラクタを呼ぶ
+		D3DResourceLeakChecker leakChecker;
+
+		///// ----- ウィンドウ ----- /////
+
+		// ポインタ
+		Window* window = nullptr;
+
+		// WindowsAPIの初期化
+		window = new Window();
+		window->Initialize();
+
+		/// --- 入力 ---
+
+		// DirectInputを初期化する
+		// 入力のインスタンスを動的に生成して、ポインタを残す
+		DirectInput* input = nullptr;
+		input = new DirectInput();
+		// 入力の初期化
+		input->Initialize(window);
+
+		/// --- Audio ---
+
+		// XAudio2を初期化して音声を再生できるようにする
+		Audio audio;
+		audio.Initialize();
+
+		// WAVファイルを読み込む
+		SoundData soundData1 = SoundLoadWave("resources/sounds/se/fanfare.wav");
+
+		// ImGuiから音声のループ再生を切り替えるフラグ
+		bool isSoundPlaying = false;
+
+		// 誰も捕捉しなかった場合に(Unhandled)、捕捉する関数を登録
+		// main関数が始まってすぐに登録
+		SetUnhandledExceptionFilter(ExportDump);
+
+		// ログのディレクトリを用意
+		std::filesystem::create_directory("logs");
+
+		// 現在時刻を取得 (UTC時刻)
+		std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+		// ログファイルの名前にコンマ何秒はいらないので、削って秒にする
+		std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>
+			nowSeconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
+		// 日本時間 (PCの設定時間) に変換
+		std::chrono::zoned_time localTime{std::chrono::current_zone(), nowSeconds};
+		// formatを使って年月日_時分秒の文字列に変換
+		std::string dateString = std::format("{:%Y%m%d_%H%M%S}", localTime);
+		// 時刻を使ってファイル名を決定
+		std::string logFilePath = std::string("logs/") + dateString + ".log";
+		// ファイルを作って書き込み準備
+		std::ofstream logStream(logFilePath);
+
+		Logger::Log(logStream, "ぶっ飛ばすぜべいべ");
+
+		// 出力ウィンドウへの文字出力
+		OutputDebugStringA("Hello,DirectX!\n");
+
+		/// --- GraphicsDevice DirectX基盤 ---
+
+		// ポインタ
+		GraphicsDevice* graphicsDevice = nullptr;
+
+		// 初期化
+		graphicsDevice = new GraphicsDevice;
+		graphicsDevice->Initialize(window, logStream);
+
+		// GraphicsDeviceが作ったデバイスを借りる
+		ID3D12Device* device = graphicsDevice->GetDevice();
+
+		/// --- CommandContext ---
+
+		// GraphicsDeviceが持つコマンド管理を借りる
+		CommandContext* commandContext = graphicsDevice->GetCommandContext();
+		// 描画コマンドを積むCommandListを取得する
+		ID3D12GraphicsCommandList* commandList = graphicsDevice->GetCommandList();
+
+		/// --- DescriptorHeap ---
+
+		// GraphicsDeviceが作った各種ディスクリプタヒープを借りる
+		DescriptorHeap& srvDescriptorHeap = graphicsDevice->GetSrvDescriptorHeap();
+
+		/// --- RTV ---
+
+		// GraphicsDeviceが作ったRTVの設定を借りる (Scene用テクスチャのフォーマットに使う)
+		const D3D12_RENDER_TARGET_VIEW_DESC& rtvDesc = graphicsDevice->GetRtvDesc();
+
+		///// ----- PSO (Pipeline State Object) ----- /////
+
+		/// --- 初期化 ---
+
+		// 全てのBlendMode分のPSOをまとめて作成する
+		PipelineState pipelineState;
+		pipelineState.Initialize(device, graphicsDevice->GetDxcCompiler(), logStream);
+
+		/// --- BlendMode ---
+
+		// 今使うBlendMode (ImGuiで切り替える)
+		BlendMode currentBlendMode = BlendMode::kNormal;
+
+		///// ----- ===== ----- /////
+
+		///// ----- WVP ----- /////
+
+		/// --- 初期化 ---
+
+		/*
+
+		// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
+		ComPtr<ID3D12Resource> wvpResource;
+		// Createが返した所有権をComPtrへ移す
+		wvpResource = graphicsDevice->CreateBufferResource(sizeof(TransformationMatrix));
+		// データを書き込む
+		TransformationMatrix* wvpData = nullptr;
+		// 書き込むためのアドレスを取得
+		wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+		// 単位行列を書き込んでおく
+		wvpData->WVP = Matrix4x4::MakeIdentity4x4();
+		wvpData->World = Matrix4x4::MakeIdentity4x4();
+
+		*/
+
+		///// ----- ===== ----- /////
+
+		///// ----- VertexBuffer ----- /////
+
+		/// --- 初期化 ---
+		// VertexResourceを生成する
+		// 頂点数の数
+		// 最大頂点数
+		const uint32_t kMaxVertexCount = 1024;
+		VertexBuffer vertexBuffer;
+		vertexBuffer.Initialize(device, kMaxVertexCount);
+
+		///// ----- Sprite ----- /////
+
+		///// ----- 初期化 ----- /////
+		/// --- Sprite専用のVertexBuffer、Material、WVPを作成 ---
+		// 2D専用オブジェクトであることが分かる名前に統一する
+		Sprite2D sprite2D;
+		sprite2D.Initialize(device, Window::kClientWidth, Window::kClientHeight, 640.0f, 360.0f);
+
+		// 三角形とは別にSpriteのTextureを選択する
+		int spriteTextureMode = 1;
+		// Spriteの描画を個別に切り替える
+		bool isSpriteVisible = true;
+
+		// Primitive3Dの描画を個別に切り替える
+		bool isPrimitive3DVisible = true;
+
+		// Particleの描画を個別に切り替える
+		bool isParticleVisible = true;
+
+		// ライティング全体の有効状態を保持する
+		bool isAllLightingEnabled = true;
+
+		// ライティング全体へ適用する方式を保持する
+		int allLightingMode = 0;
+
+		/// --- Material用のリソースを作る ---
+		ComPtr<ID3D12Resource> materialResource;
+		// Createが返した所有権をComPtrへ移す
+		materialResource = graphicsDevice->CreateBufferResource(sizeof(Material));
+		// マテリアルにデータを書き込む
+		Material* materialData = nullptr;
+		// 書き込むためのアドレスを取得
+		materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+		// 色書き込み
+		// 基本色を白にする
+		materialData->color =
+		{1.0f, 1.0f, 1.0f, 1.0f};
+		// main側の頂点法線が未設定なので一旦無効にする
+		materialData->enableLighting = false;
+		// 初期状態ではUV座標を変化させない
+		materialData->uvTransform =
+			Matrix4x4::MakeIdentity4x4();
+
+		/// --- Resourceのデータを書き込む ---
+		// データを書き込む
+		VertexData* vertexData = vertexBuffer.GetData();
+		// 書き込むためのアドレスを取得
+		// VertexBufferの初期化時にMapしたアドレスを使用する
+
+		// 三角錐を構成する
+		VertexData pyramidVertices[12] = {
+			// 前面
+			{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 左下
+			{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},	 // 頂点
+			{{0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}},	 // 右下
+
+			// 右側面
+			{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 右下
+			{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},	// 頂点
+			{{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},	// 奥
+
+			// 左側面
+			{{0.0f, -0.5f, 0.5f, 1.0f}, {0.0f, 1.0f}},	 // 奥
+			{{0.0f, 0.5f, 0.0f, 1.0f}, {0.5f, 0.0f}},	 // 頂点
+			{{-0.5f, -0.5f, -0.5f, 1.0f}, {1.0f, 1.0f}}, // 左下
+
+			// 底面
+			{{-0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 1.0f}}, // 左前
+			{{0.5f, -0.5f, -0.5f, 1.0f}, {0.0f, 0.0f}},	 // 右前
+			{{0.0f, -0.5f, 0.5f, 1.0f}, {1.0f, 1.0f}},	 // 奥
+		};
+
+		// データをGPUリソースへ書き込む(for文でコピー)
+		for (uint32_t i = 0; i < 12; ++i) {
+			vertexData[i] = pyramidVertices[i];
+		}
+
+		///// ----- 平行光源 ----- /////
+
+		/// --- 初期化 ---
+		// 平行光源の定数バッファを作成し、初期値を書き込む
+		DirectionalLight directionalLight;
+		directionalLight.Initialize(device);
+
+		///// ----- ===== ----- /////
+
+		///// ----- TextureManager ----- /////
+
+		/// --- 初期化 ---
+		// テクスチャの切り替え用
+		int textureMode = 0;
+
+		// Textureを読み込み、GPUへの転送とSRVの作成を行う
+		TextureManager textureManager;
+		textureManager.Initialize(graphicsDevice);
+
+		/// --- Texture転送コマンドの実行 ---
+
+		// コマンドを実行してGPUの完了を待つ
+		commandContext->ExecuteAndWait();
+
+		// 転送が終わったのでソースは解放する
+		// GPUへの転送が終わったので転送用リソースを解放する
+		textureManager.ReleaseIntermediateResources();
+
+		// ImGuiを描画するSwapChain側は、実際のウィンドウサイズへ追従させる
+		// ->GraphicsDevice が持っている。
+
+		///// ----- ===== ----- /////
+
+		///// ----- 変数の宣言 ----- /////
+
+		/// --- 三角形・三角錐 ---
+
+		// 3Dオブジェクトの状態をPrimitive3Dへ集約し、既存の描画処理から参照して使う
+		Primitive3D primitive3D;
+		primitive3D.Initialize(device);
+		Transform& transform = primitive3D.GetTransform();
+
+		// 描画モード
+		int& displayMode = primitive3D.GetDisplayMode();
+
+		///// ----- ===== ----- /////
+
+		///// ----- ParticleSystem ----- /////
+
+		/// --- 初期化 ---
+		// 演出モード4で使用する範囲と最大数を設定する
+		ParticleSystem particleSystem;
+		particleSystem.Initialize(device, -0.9f, 0.9f, 50);
+
+		///// ----- ===== ----- /////
+
+		///// ----- カメラ ----- /////
+		Camera camera;
+
+		camera.Initialize(
+			float(Window::kClientWidth) /
+			float(Window::kClientHeight));
+
+		/*
+
+		// Object3D用のWorld行列
+		Matrix4x4 worldMatrix =
+			Matrix4x4::MakeAffineMatrix(
+				transform.scale,
+				transform.rotate,
+				transform.translate);
+
+		*/
+
+		///// ----- ===== ----- /////
+
+		///// ----- デバッグカメラ ----- /////
+
+		DebugCamera debugCamera;
+
+		debugCamera.Initialize(
+			float(Window::kClientWidth) /
+			float(Window::kClientHeight));
+
+		// falseは通常カメラ、trueはデバッグカメラを使用する
+		bool isDebugCameraActive = false;
+
+		///// ----- ===== ----- /////
+
+		///// ----- 球 (Sphere) ----- /////
+
+		Sphere sphere;
+
+		// ImGuiでは1～32分割まで変更できるようにする
+		sphere.Initialize(device, 32);
+
+		// Sphereのテクスチャ切り替え用の選択番号
+		int sphereTextureMode = 3;
+		// Sphereの描画を個別に切り替える
+		bool isSphereVisible = true;
+
+		///// ----- ===== ----- /////
+
+		///// ----- Plane OBJ Model ----- /////
+
+		Model planeModel;
+
+		// resourcesフォルダのplane.objを読み込む
+		planeModel.Initialize(
+			device,
+			"resources/models/plane",
+			"plane.obj");
+
+		// 片面モデルの表側が初期状態でカメラを向くようにする (Y軸で半回転)
+		planeModel.GetTransform().rotate.y = std::numbers::pi_v<float>;
+
+		// 平面モデルの表示を切り替える
+		bool isPlaneVisible = true;
+
+		// MTLで指定されたテクスチャに対応する番号を取得する
+		int planeTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				planeModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Axis OBJ Model ----- /////
+
+		Model axisModel;
+
+		// resourcesフォルダのaxis.objを読み込む
+		axisModel.Initialize(
+			device,
+			"resources/models/axis",
+			"axis.obj");
+
+		// Axisモデルの表示を切り替える
+		bool isAxisVisible = true;
+
+		// axis.mtlで指定されたテクスチャ番号を取得する
+		int axisTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				axisModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Multi Mesh OBJ Model ----- /////
+
+		Model multiMeshModel;
+
+		// 複数Meshが含まれているOBJファイルを読み込む
+		multiMeshModel.Initialize(
+			device,
+			"resources/models/multiMesh",
+			"multiMesh.obj");
+
+		// ちょいずらす
+		multiMeshModel.GetTransform().translate.x = 3.0f;
+
+		// MultiMeshモデルの表示を切り替える
+		bool isMultiMeshVisible = true;
+
+		// MTLで指定されたテクスチャ番号を取得する
+		int multiMeshTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				multiMeshModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Multi Material OBJ Model ----- /////
+
+		Model multiMaterialModel;
+
+		// 複数Materialを使用するOBJファイルを読み込む
+		multiMaterialModel.Initialize(
+			device,
+			"resources/models/multiMaterial",
+			"multiMaterial.obj");
+
+		// 他のモデルと重ならない位置へ移動する
+		multiMaterialModel.GetTransform().translate.x =
+			-3.0f;
+
+		// MultiMaterialモデルの表示を切り替える
+		bool isMultiMaterialVisible = true;
+
+		// Propertiesとの互換性用に先頭のTexture番号を取得する
+		int multiMaterialTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				multiMaterialModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Bunny OBJ Model ----- /////
+
+		Model bunnyModel;
+
+		// Model::InitializeからModelLoaderを通してbunny.objを読み込む
+		bunnyModel.Initialize(
+			device,
+			"resources/models/bunny",
+			"bunny.obj");
+
+		// ほかのモデルと重ならない位置へ配置する
+		bunnyModel.GetTransform().translate = {
+			-4.0f,
+			0.0f,
+			0.0f
+		};
+
+		// Bunnyの表示状態を保持する
+		bool isBunnyVisible = true;
+
+		// MTLで指定された初期Texture番号を取得する
+		int bunnyTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				bunnyModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Teapot OBJ Model ----- /////
+
+		Model teapotModel;
+
+		// Model::InitializeからModelLoaderを通してteapot.objを読み込む
+		teapotModel.Initialize(
+			device,
+			"resources/models/teapot",
+			"teapot.obj");
+
+		// ほかのモデルと重ならない位置へ配置する
+		teapotModel.GetTransform().translate = {
+			0.0f,
+			0.0f,
+			0.0f
+		};
+
+		// Teapotの表示状態を保持する
+		bool isTeapotVisible = true;
+
+		// teapot.mtlのcheckerBoard.pngに対応する番号を取得する
+		int teapotTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				teapotModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Suzanne OBJ Model ----- /////
+
+		Model suzanneModel;
+
+		// Model::InitializeからModelLoaderを通してsuzanne.objを読み込む
+		suzanneModel.Initialize(
+			device,
+			"resources/models/suzanne",
+			"suzanne.obj");
+
+		// ほかのモデルと重ならない位置へ配置する
+		suzanneModel.GetTransform().translate = {
+			4.0f,
+			0.0f,
+			0.0f
+		};
+
+		// Suzanneの表示状態を保持する
+		bool isSuzanneVisible = true;
+
+		// MTLに画像指定がないためWhiteが選択される
+		int suzanneTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				suzanneModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- Fence OBJ Model ----- /////
+
+		Model fenceModel;
+
+		// resources/models/fenceフォルダのfence.objを読み込む
+		fenceModel.Initialize(
+			device,
+			"resources/models/fence",
+			"fence.obj");
+
+		// 片面モデルの表側が初期状態でカメラを向くようにする (Y軸で半回転)
+		fenceModel.GetTransform().rotate.y = std::numbers::pi_v<float>;
+
+		// Fenceモデルの表示を切り替える
+		bool isFenceVisible = true;
+
+		// fence.mtlで指定されたテクスチャ番号を取得する
+		int fenceTextureMode =
+			static_cast<int>(
+				textureManager.FindTextureIndex(
+				fenceModel.GetTextureFilePath()));
+
+		///// ----- ===== ----- /////
+
+		///// ----- ImGuiの初期化 ----- /////
+#ifdef USE_IMGUI
+		// Texture用SRVは1番から始まるため、その直後をScene用にする
+		constexpr uint32_t kTextureSrvStartIndex = 1;
+		constexpr uint32_t kSceneSrvDescriptorIndex =
+			kTextureSrvStartIndex + TextureManager::kTextureCount;
+
+		SceneRenderTexture sceneRenderTexture;
+		sceneRenderTexture.Initialize(
+			device,
+			srvDescriptorHeap,
+			kSceneSrvDescriptorIndex,
+			Window::kClientWidth,
+			Window::kClientHeight,
+			rtvDesc.Format);
+
+		// ゲーム画面の描画先をGraphicsDeviceに教える
+		graphicsDevice->SetSceneRenderTexture(&sceneRenderTexture);
+
+		// ImGuiの初期化はGraphicsDeviceで済んでいるので、入力の情報だけ受け取る
+		ImGuiIO& io = ImGui::GetIO();
+
+		/// --- ヒエラルキー ---
+
+		// ゲームクラスをImGuiへ直接依存させず、Editor用ラッパーを介して表示する
+		Primitive3DEditorObject primitive3DEditor(
+			primitive3D,
+			textureMode,
+			particleSystem,
+			isPrimitive3DVisible);
+		Sprite2DEditorObject sprite2DEditor(sprite2D, spriteTextureMode, isSpriteVisible);
+		ParticleEditorObject particleEditor(
+			particleSystem,
+			isParticleVisible);
+		SceneSettingsEditorObject sceneSettingsEditor(primitive3D);
+
+		// SphereとSphere専用Texture番号をEditorへ接続する
+		SphereEditorObject sphereEditor(sphere, sphereTextureMode, isSphereVisible);
+
+		// OBJ平面と平面専用の表示設定をEditorへ接続する
+		ModelEditorObject planeModelEditor(
+			planeModel,
+			"Plane Model",
+			planeTextureMode,
+			isPlaneVisible);
+
+		// AxisモデルとAxis専用の表示設定をEditorへ接続する
+		ModelEditorObject axisModelEditor(
+			axisModel,
+			"Axis Model",
+			axisTextureMode,
+			isAxisVisible);
+
+		// MultiMeshモデルをHierarchyとPropertiesへ接続する
+		ModelEditorObject multiMeshModelEditor(
+			multiMeshModel,
+			"Multi Mesh Model",
+			multiMeshTextureMode,
+			isMultiMeshVisible);
+
+		// MultiMaterialモデルをHierarchyとPropertiesへ接続する
+		ModelEditorObject multiMaterialModelEditor(
+			multiMaterialModel,
+			"Multi Material Model",
+			multiMaterialTextureMode,
+			isMultiMaterialVisible);
+
+		// BunnyをHierarchyとPropertiesへ接続する
+		ModelEditorObject bunnyModelEditor(
+			bunnyModel,
+			"Bunny Model",
+			bunnyTextureMode,
+			isBunnyVisible);
+
+		// TeapotをHierarchyとPropertiesへ接続する
+		ModelEditorObject teapotModelEditor(
+			teapotModel,
+			"Teapot Model",
+			teapotTextureMode,
+			isTeapotVisible);
+
+		// SuzanneをHierarchyとPropertiesへ接続する
+		ModelEditorObject suzanneModelEditor(
+			suzanneModel,
+			"Suzanne Model",
+			suzanneTextureMode,
+			isSuzanneVisible);
+
+		// FenceをHierarchyとPropertiesへ接続する
+		ModelEditorObject fenceModelEditor(
+			fenceModel,
+			"Fence Model",
+			fenceTextureMode,
+			isFenceVisible);
+
+		/// --- hierarchyの項目 ---
+
+		std::vector<IEditorObject*> editorObjects = {
+			// Primitive3Dの直後に、関連するSceneのモード設定を並べる
+			&primitive3DEditor,
+			&sceneSettingsEditor,
+			&particleEditor,
+
+			// 独立した描画オブジェクトはHierarchyの後ろへ並べる
+			// 3D
+			&sphereEditor,
+			&planeModelEditor,
+			&axisModelEditor,
+			&multiMeshModelEditor,
+			&multiMaterialModelEditor,
+			&bunnyModelEditor,
+			&teapotModelEditor,
+			&suzanneModelEditor,
+			&fenceModelEditor,
+
+			// 2D
+			&sprite2DEditor};
+		IEditorObject* selectedObject = nullptr;
+
+#endif // USE_IMGUI
+
+		///// ----- メインループ ----- /////
+		// ウィンドウのxボタンが押されるまでループ
+		while (true) {
+			// windowにメッセージが来てたら最優先で処理させる
+			if (window->ProcessMessage()) {
+				// 終了のメッセージが来たのでゲームループを抜ける
+				break;
+			}
+
+			// 前のフレームからの経過時間 (秒)
+			const float deltaTime = graphicsDevice->GetFrameRateController()->GetDeltaTime();
+
+			// WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
+			RECT clientRect{};
+			GetClientRect(window->GetHwnd(), &clientRect);
+			const uint32_t clientWidth = static_cast<uint32_t>(clientRect.right - clientRect.left);
+			const uint32_t clientHeight = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
+			if (clientWidth == 0 || clientHeight == 0) {
+				continue;
+			}
+
+#ifdef USE_IMGUI
+
+			// エディター有効時は、WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
+			// (エディター無効時はBackBufferを1280x720のままにして、ウィンドウに合わせて引き伸ばして表示する)
+			if (graphicsDevice->Resize(clientWidth, clientHeight)) {
+				// 作り直したときは、カメラの縦横比も新しい大きさに合わせる
+				camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
+			}
+
+#endif // USE_IMGUI
+
+			///// ----- ImGui先頭 ----- /////
+
+#ifdef USE_IMGUI
+
+			// ImGuiのフレームを開始する
+			graphicsDevice->BeginImGuiFrame();
+
+			// メインViewport全体をDock領域にして、最大化やサイズ変更へ追従させる
+			const ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+			const ImGuiID dockspaceId = ImGui::GetID("MainEditorDockSpace");
+
+			// 保存されたDock配置がない場合だけ、デフォルト配置を作成する
+			if (ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
+				SetupDefaultDockLayout(
+					dockspaceId,
+					mainViewport->Size);
+			}
+
+			// Dockノードを組み直したあとにViewportへ登録する
+			ImGui::DockSpaceOverViewport(dockspaceId, mainViewport);
+
+			ImGui::Begin("Directional Light");
+
+			// ライティングを使用する全オブジェクトへまとめて反映する
+			if (ImGui::Checkbox(
+				"Enable All Lighting",
+				&isAllLightingEnabled)) {
+				primitive3D.SetLightingEnabled(
+					isAllLightingEnabled);
+				sphere.SetLightingEnabled(
+					isAllLightingEnabled);
+				planeModel.SetLightingEnabled(
+					isAllLightingEnabled);
+				axisModel.SetLightingEnabled(
+					isAllLightingEnabled);
+				multiMeshModel.SetLightingEnabled(
+					isAllLightingEnabled);
+				multiMaterialModel.SetLightingEnabled(
+					isAllLightingEnabled);
+				// 追加したOBJモデルにも一括ライティング設定を反映する
+				bunnyModel.SetLightingEnabled(
+					isAllLightingEnabled);
+				teapotModel.SetLightingEnabled(
+					isAllLightingEnabled);
+				suzanneModel.SetLightingEnabled(
+					isAllLightingEnabled);
+				fenceModel.SetLightingEnabled(
+					isAllLightingEnabled);
+
+				// ONにしたときは選択中の方式も全体へ適用する
+				if (isAllLightingEnabled) {
+					primitive3D.GetLightingMode() =
+						allLightingMode;
+					sphere.GetLightingMode() =
+						allLightingMode;
+					planeModel.GetLightingMode() =
+						allLightingMode;
+					axisModel.GetLightingMode() =
+						allLightingMode;
+					multiMeshModel.GetLightingMode() =
+						allLightingMode;
+					multiMaterialModel.GetLightingMode() =
+						allLightingMode;
+					// 追加したOBJモデルにも選択中の方式を反映する
+					bunnyModel.GetLightingMode() =
+						allLightingMode;
+					teapotModel.GetLightingMode() =
+						allLightingMode;
+					suzanneModel.GetLightingMode() =
+						allLightingMode;
+					fenceModel.GetLightingMode() =
+						allLightingMode;
+				}
+			}
+
+			if (isAllLightingEnabled) {
+				const char* allLightingModes[] = {
+					"Lambert",
+					"Half Lambert"};
+
+				// 全オブジェクトへ同じライティング方式を適用する
+				if (ImGui::Combo(
+					"All Lighting Mode",
+					&allLightingMode,
+					allLightingModes,
+					IM_ARRAYSIZE(allLightingModes))) {
+					primitive3D.GetLightingMode() =
+						allLightingMode;
+					sphere.GetLightingMode() =
+						allLightingMode;
+					planeModel.GetLightingMode() =
+						allLightingMode;
+					axisModel.GetLightingMode() =
+						allLightingMode;
+					multiMeshModel.GetLightingMode() =
+						allLightingMode;
+					multiMaterialModel.GetLightingMode() =
+						allLightingMode;
+					// 追加したOBJモデルの方式も一括で切り替える
+					bunnyModel.GetLightingMode() =
+						allLightingMode;
+					teapotModel.GetLightingMode() =
+						allLightingMode;
+					suzanneModel.GetLightingMode() =
+						allLightingMode;
+				}
+			}
+
+			ImGui::Separator();
+
+			// 光源の色・向き・明るさを調整
+			directionalLight.DrawImGui();
+
+			ImGui::End();
+
+			/// --- Audio ---
+
+			ImGui::Begin("Audio");
+
+			// ONになった瞬間にループ再生し、OFFになった瞬間に停止する
+			if (ImGui::Checkbox("Play Fanfare", &isSoundPlaying)) {
+				if (isSoundPlaying) {
+					audio.SoundPlayWave(soundData1, true);
+				} else {
+					audio.SoundStopWave();
+				}
+			}
+
+			ImGui::End();
+
+			/// --- BlendMode切り替え ---
+
+			ImGui::Begin("BlendMode");
+
+			// ImGuiでBlendModeを選ぶ
+			const char* blendModeNames[] = {
+				"None",
+				"Normal",
+				"Add",
+				"Subtract",
+				"Multiply",
+				"Screen",
+			};
+			int blendModeIndex = static_cast<int>(currentBlendMode);
+
+			if (ImGui::Combo("BlendMode", &blendModeIndex, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+				currentBlendMode = static_cast<BlendMode>(blendModeIndex);
+			}
+
+			ImGui::End();
+
+			DrawHierarchy(editorObjects, selectedObject);
+
+			const bool isSceneHovered =
+				DrawScene(
+					sceneRenderTexture.GetSRVHandle(),
+					selectedObject);
+
+			if (isSceneHovered) {
+				ImGuiIO& io = ImGui::GetIO();
+
+				const Vector2 mouseDelta = {
+					io.MouseDelta.x,
+					io.MouseDelta.y
+				};
+
+				if (isDebugCameraActive) {
+					// デバッグカメラ有効中は自由移動用の操作を行う
+					if (ImGui::IsMouseDragging(
+						ImGuiMouseButton_Left)) {
+						debugCamera.RotateByMouse(mouseDelta);
+					}
+
+					if (ImGui::IsMouseDragging(
+						ImGuiMouseButton_Right)) {
+						debugCamera.MoveByMouse(mouseDelta);
+					}
+
+					if (io.MouseWheel != 0.0f) {
+						debugCamera.MoveForwardByMouse(
+							io.MouseWheel);
+					}
+
+				} else {
+					// 通常カメラ有効中は既存のカメラ操作を行う
+					// Scene上の左ドラッグでCameraを回転する
+					if (ImGui::IsMouseDragging(
+						ImGuiMouseButton_Left)) {
+						camera.RotateByMouse(mouseDelta);
+					}
+
+					// Scene上の右ドラッグでCameraを平行移動する
+					if (ImGui::IsMouseDragging(
+						ImGuiMouseButton_Right)) {
+						camera.MoveByMouse(mouseDelta);
+					}
+
+					// Scene上のホイールでCameraを前後移動する
+					if (io.MouseWheel != 0.0f) {
+						camera.ZoomByMouse(io.MouseWheel);
+					}
+				}
+			}
+
+			DrawContentBrowserAssets(textureManager);
+			DrawStatistics(
+				graphicsDevice->GetAdapterName(),
+				*graphicsDevice->GetFrameRateController(),
+				particleSystem,
+				camera,
+				debugCamera,
+				isPrimitive3DVisible,
+				isParticleVisible,
+				isSphereVisible,
+				isPlaneVisible,
+				isAxisVisible,
+				isMultiMeshVisible,
+				isMultiMaterialVisible,
+				isBunnyVisible,
+				isTeapotVisible,
+				isSuzanneVisible,
+				isFenceVisible,
+				isSpriteVisible);
+			DrawFlowGraph(particleSystem, primitive3D);
+
+#endif // USE_IMGUI
+
+			///// ----- キーボードの処理 ----- /////
+
+			// 毎フレーム、キーボード状態を更新する
+			input->Update();
+
+			// 上段の0キーを押している間、毎フレーム「0」を表示する
+			if (input->IsPress(DIK_0)) {
+				OutputDebugStringA("0\n");
+			}
+
+			// 上段の1キーを押した瞬間だけ「1」を表示する
+			if (input->IsTrigger(DIK_1)) {
+				OutputDebugStringA("1\n");
+			}
+
+			// Spaceキーを押した瞬間に使用するカメラを切り替える
+			if (input->IsTrigger(DIK_SPACE)) {
+				isDebugCameraActive =
+					!isDebugCameraActive;
+			}
+
+			/// --- Spriteの移動 ---
+
+			// 1秒で動く量(ピクセル) 今までの5ピクセル × 60フレーム
+			const float kSpriteSpeed = 300.0f;
+
+			// このフレームで動く量 (FPSが変わっても1秒で動く距離は同じになる)
+			const float spriteMove = kSpriteSpeed * deltaTime;
+
+			// Spriteの位置を参照で受け取って、直接書き換える
+			Transform& spriteTransform = sprite2D.GetTransform();
+
+			// 左右キーで横に動かす
+			if (input->IsPress(DIK_LEFT)) {
+				spriteTransform.translate.x -= spriteMove;
+			}
+			if (input->IsPress(DIK_RIGHT)) {
+				spriteTransform.translate.x += spriteMove;
+			}
+
+			// 上下キーで縦に動かす(画面座標は下がプラスなので、上はマイナス)
+			if (input->IsPress(DIK_UP)) {
+				spriteTransform.translate.y -= spriteMove;
+			}
+			if (input->IsPress(DIK_DOWN)) {
+				spriteTransform.translate.y += spriteMove;
+			}
+
+			///// ----- ゲームの処理 ----- /////
+
+			/// --- カメラ ---
+
+			camera.Update();
+
+			/// --- デバッグカメラ ---
+
+			debugCamera.Update();
+
+			/// --- ParticleSystemの更新 ---
+
+			// ImGuiで切り替えても、現在のフレームは同じモードで更新と描画を行う
+			const int renderingMode = displayMode;
+
+			// Production Modeだけは既存のParticleSystem用頂点バッファを使用する
+			if (renderingMode == 5) {
+				particleSystem.Update(deltaTime);
+			}
+
+			///// ----- 行列の計算 ----- /////
+
+			/// --- ワールド行列の更新 ---
+
+			/*
+
+			worldMatrix = Matrix4x4::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+
+			*/
+
+			/// --- ビュー行列の更新 ---
+
+			// 選択中のカメラからView行列を取得する
+			const Matrix4x4& viewMatrix =
+				isDebugCameraActive
+				? debugCamera.GetViewMatrix()
+				: camera.GetViewMatrix();
+
+			/// --- プロジェクション行列の更新 ---
+
+			// 選択中のカメラからProjection行列を取得する
+			const Matrix4x4& projectionMatrix =
+				isDebugCameraActive
+				? debugCamera.GetProjectionMatrix()
+				: camera.GetProjectionMatrix();
+
+			// 三角形・三角錐の頂点と専用WVPはPrimitive3D自身が更新する
+			primitive3D.Update(viewMatrix, projectionMatrix);
+
+			// Sphere専用のWVPを更新する
+			sphere.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// OBJ平面専用のWVPを更新する
+			planeModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// Axisモデル専用のWVPを更新する
+			axisModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// MultiMeshモデル専用のWVPを更新する
+			multiMeshModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// MultiMaterialモデル専用のWVPを更新する
+			multiMaterialModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// Bunny専用のWVPを更新する
+			bunnyModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// Teapot専用のWVPを更新する
+			teapotModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// Suzanne専用のWVPを更新する
+			suzanneModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			// Fence専用のWVPを更新する
+			fenceModel.Update(
+				viewMatrix,
+				projectionMatrix);
+
+			/// --- Object3D用WVPを計算する ---
+
+			/*
+
+			// ワールド、ビュー、プロジェクションを掛け合わせる
+			Matrix4x4 worldViewProjectionMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::Multiply(viewMatrix, projectionMatrix));
+
+			// wvp行列をGPUに送る
+			// 頂点座標をクリップ空間へ変換する行列を送る
+			wvpData->WVP = worldViewProjectionMatrix;
+
+			// ライティングで法線を変換するWorld行列を送る
+			wvpData->World = worldMatrix;
+
+			*/
+
+			///// ----- ImGui中身 ----- /////
+#ifdef USE_IMGUI
+				// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
+				// Dear ImGui標準機能を確認したいときだけ、次の行を有効にする
+				// ImGui::ShowDemoWindow();
+
+				// 旧Windowパネルの編集項目をPropertiesへまとめる
+			ImGui::Begin("Properties");
+			if (selectedObject) {
+				selectedObject->DrawProperties();
+			} else {
+				ImGui::TextDisabled("Select an item in Hierarchy.");
+			}
+			ImGui::End();
+
+#endif // USE_IMGUI
+
+			// ImGuiで変更されたSpriteのSRTからWVPを更新する
+			sprite2D.Update();
+
+			///// ----- ImGui終わり ----- /////
+#ifdef USE_IMGUI
+				// 内部コマンドを生成する
+			ImGui::Render();
+#endif // USE_IMGUI
+
+#pragma region
+			///// ----- コマンドを積む ----- /////
+
+			// DirectX描画開始
+			graphicsDevice->PreDraw();
+
+			// RootSignatureの設定
+			commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
+			// PSOの設定 (不透明)
+			commandList->SetPipelineState(pipelineState.GetPipelineState(BlendMode::kNone));
+			// 頂点バッファビューの設定
+			const D3D12_VERTEX_BUFFER_VIEW& vertexBufferView = vertexBuffer.GetView();
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+			// 形状を設定
+			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			// マテリアルCBufferの場所を設定
+			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+			// wvp用のBufferの場所を設定
+			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			// 平行光源をPixel Shaderのb1へ設定する
+			directionalLight.Bind(commandList, 3);
+
+			// 画像を指定
+			D3D12_GPU_DESCRIPTOR_HANDLE currentTextureHandle =
+				textureManager.GetSrvHandle(static_cast<uint32_t>(textureMode));
+
+			// 選択されたテクスチャをシェーダーへ渡す
+			commandList->SetGraphicsRootDescriptorTable(
+				2,
+				currentTextureHandle);
+
+			// モードの描画
+			if (isParticleVisible &&
+				renderingMode == 5) {
+				// Production ModeではParticleSystemを描画する
+				particleSystem.Draw(
+					commandList,
+					currentTextureHandle,
+					viewMatrix,
+					projectionMatrix);
+			} else if (isPrimitive3DVisible) {
+				// Noneを含む描画判定はPrimitive3D側へ集約する
+				primitive3D.Draw(commandList, currentTextureHandle);
+			}
+
+			///// ----- Sprite描画 ----- /////
+
+			/// --- Sphere描画 ---
+
+			if (isSphereVisible) {
+				// 表示中だけ選択されたTextureでSphereを描画する
+				const D3D12_GPU_DESCRIPTOR_HANDLE sphereTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(sphereTextureMode));
+				sphere.Draw(commandList, sphereTextureHandle);
+			}
+
+			/// --- OBJ平面描画 ---
+
+			if (isPlaneVisible) {
+				// 平面モデルで使用するTextureを取得する
+				const D3D12_GPU_DESCRIPTOR_HANDLE planeTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(planeTextureMode));
+
+				// 選択中のBlendModeのPSOに切り替える
+				commandList->SetPipelineState(pipelineState.GetPipelineState(currentBlendMode));
+
+				// OBJから読み込んだ平面を描画する
+				planeModel.Draw(
+					commandList,
+					planeTextureHandle);
+
+				// ほかの不透明な物体のために、合成なしのPSOに戻す
+				commandList->SetPipelineState(pipelineState.GetPipelineState(BlendMode::kNone));
+			}
+
+			/// --- Axisモデル描画 ---
+
+			if (isAxisVisible) {
+				// Axisモデルで使用するTextureを取得する
+				const D3D12_GPU_DESCRIPTOR_HANDLE axisTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(axisTextureMode));
+
+				// OBJから読み込んだAxisモデルを描画する
+				axisModel.Draw(
+					commandList,
+					axisTextureHandle);
+			}
+
+			/// --- MultiMeshモデル描画 ---
+
+			if (isMultiMeshVisible) {
+				// MultiMeshモデルで使用するTextureを取得する
+				const D3D12_GPU_DESCRIPTOR_HANDLE multiMeshTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(
+						multiMeshTextureMode));
+
+				// 複数Meshを含むモデルを描画する
+				multiMeshModel.Draw(
+					commandList,
+					multiMeshTextureHandle);
+			}
+
+			/// --- MultiMaterialモデル描画 ---
+
+			if (isMultiMaterialVisible) {
+				// MeshごとにMTLで指定されたTextureを使って描画する
+				multiMaterialModel.DrawWithMaterials(
+					commandList,
+					textureManager);
+			}
+
+			/// --- Bunnyモデル描画 ---
+
+			if (isBunnyVisible) {
+				// ImGuiで選択されたTextureをBunnyへ設定する
+				const D3D12_GPU_DESCRIPTOR_HANDLE bunnyTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(
+						bunnyTextureMode));
+
+				bunnyModel.Draw(
+					commandList,
+					bunnyTextureHandle);
+			}
+
+			/// --- Teapotモデル描画 ---
+
+			if (isTeapotVisible) {
+				// ImGuiで選択されたTextureをTeapotへ設定する
+				const D3D12_GPU_DESCRIPTOR_HANDLE teapotTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(
+						teapotTextureMode));
+
+				teapotModel.Draw(
+					commandList,
+					teapotTextureHandle);
+			}
+
+			/// --- Suzanneモデル描画 ---
+
+			if (isSuzanneVisible) {
+				// ImGuiで選択されたTextureをSuzanneへ設定する
+				const D3D12_GPU_DESCRIPTOR_HANDLE suzanneTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(
+						suzanneTextureMode));
+
+				suzanneModel.Draw(
+					commandList,
+					suzanneTextureHandle);
+			}
+
+			/// --- Fenceモデル描画 ---
+
+			if (isFenceVisible) {
+				// fence.pngなどImGuiで選択されたTextureをFenceへ設定する
+				const D3D12_GPU_DESCRIPTOR_HANDLE fenceTextureHandle =
+					textureManager.GetSrvHandle(
+						static_cast<uint32_t>(
+						fenceTextureMode));
+
+				fenceModel.Draw(
+					commandList,
+					fenceTextureHandle);
+			}
+
+			/// --- Texture ---
+
+			// 三角形とは別に選択されたTextureを取得する
+			if (isSpriteVisible) {
+				// 表示中だけ選択されたTextureでSpriteを描画する
+				const D3D12_GPU_DESCRIPTOR_HANDLE spriteTextureHandle =
+					textureManager.GetSrvHandle(static_cast<uint32_t>(spriteTextureMode));
+				// 3Dの後に描画してSpriteを最前面へ表示する
+				sprite2D.Draw(commandList, spriteTextureHandle);
+			}
+
+			// DirectX描画終了
+			graphicsDevice->PostDraw();
+
+#pragma endregion コマンドを積む処理
+
+		} // whileの終わり
+
+		/// --- ImGui終了処理 ---
+#ifdef USE_IMGUI
+
+		sceneRenderTexture.Finalize();
+
+#endif // USE_IMGUI
+
+		///// ----- 解放処理 ----- /////
+
+		/// --- 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前) ---
+
+		vertexBuffer.Finalize();
+
+		primitive3D.Finalize();
+		sphere.Finalize();			   // 球
+		planeModel.Finalize();		   // OBJ平面のリソースを解放する
+		axisModel.Finalize();		   // Axisモデルのリソースを解放する
+		multiMeshModel.Finalize();	   // 複数Meshモデルのリソースを解放する
+		multiMaterialModel.Finalize(); // 複数Materialモデルのリソースを解放する
+		bunnyModel.Finalize(); // bunnyモデルのリソースを解放
+		teapotModel.Finalize(); // teapotモデルのリソースを解放
+		suzanneModel.Finalize();// suzanneモデルのリソースを解放
+		sprite2D.Finalize();
+		particleSystem.Finalize();
+		// ComPtrへ変更したResourceはデストラクタが自動解放する
+		// 平行光源のリソースを解放する
+
+		// 読み込んだテクスチャをすべて解放する
+		textureManager.Finalize();
+
+		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
+
+		pipelineState.Finalize();
+
+		/// --- 5_スワップチェーンとバックバッファリソース ---
+
+		// ReportLiveObjectsより前にComPtrが所有するオブジェクトを解放する
+
+		/// --- 8_すべての依存リソースが消えたので解放 ---
+
+		// ComPtrへ変更したCOMオブジェクトのReleaseは不要
+
+		// DX12リソースがなくなった後にウィンドウを閉じる
+		// 再生中のSourceVoiceを停止して破棄する
+		audio.SoundStopWave();
+
+		// 読み込んだWAVデータのバッファを解放する
+		SoundUnload(&soundData1);
+
+		// XAudio2を明示的に解放する（内部でxAudio2_.Reset()を呼ぶ）
+		audio.Finalize();
+
+		// 入力を開放する (ウィンドウを閉じる前に、キーボードの取得をやめる)
+		input->Finalize();
+		// 動的に生成したインスタンスを削除する
+		delete input;
+		input = nullptr;
+
+		/// --- graphicsDevice ---
+
+		// DirectX12の描画の基盤の終了処理
+		graphicsDevice->Finalize();
+		delete graphicsDevice;
+		graphicsDevice = nullptr;
+
+		// WindowsAPIの終了処理 (ウィンドウを閉じて、COMを終了する)
+		window->Finalize();
+		// 動的に生成したインスタンスを削除する
+		delete window;
+		window = nullptr;
+
+	} // leakCheckerより後に作られたComPtrを先に解放する
+
+	return 0;
+}

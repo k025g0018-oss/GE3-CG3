@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Development|x64">
+      <Configuration>Development</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{93c8e758-6004-4558-8417-581133e4c936}</ProjectGuid>
+    <RootNamespace>DirectXGame</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)../generated/outputs/$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <OutDir>$(SolutionDir)../generated/outputs/$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)../generated/outputs/$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)DirectXGame;$(ProjectDir)DirectXGame\engine\2d;$(ProjectDir)DirectXGame\engine\3d;$(ProjectDir)DirectXGame\engine\audio;$(ProjectDir)DirectXGame\engine\base;$(ProjectDir)DirectXGame\engine\editor;$(ProjectDir)DirectXGame\engine\io;$(ProjectDir)DirectXGame\engine\math;$(ProjectDir)DirectXGame\engine\pipeline;$(ProjectDir)DirectXGame\engine\scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+      <AdditionalOptions>/ignore:4049 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <Manifest>
+      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+    </Manifest>
+    <PostBuildEvent>
+      <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
+copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)DirectXGame;$(ProjectDir)DirectXGame\engine\2d;$(ProjectDir)DirectXGame\engine\3d;$(ProjectDir)DirectXGame\engine\audio;$(ProjectDir)DirectXGame\engine\base;$(ProjectDir)DirectXGame\engine\editor;$(ProjectDir)DirectXGame\engine\io;$(ProjectDir)DirectXGame\engine\math;$(ProjectDir)DirectXGame\engine\pipeline;$(ProjectDir)DirectXGame\engine\scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+    </Link>
+    <Manifest>
+      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+    </Manifest>
+    <PostBuildEvent>
+      <Command>   copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <Optimization>Disabled</Optimization>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)DirectXGame;$(ProjectDir)DirectXGame\engine\2d;$(ProjectDir)DirectXGame\engine\3d;$(ProjectDir)DirectXGame\engine\audio;$(ProjectDir)DirectXGame\engine\base;$(ProjectDir)DirectXGame\engine\editor;$(ProjectDir)DirectXGame\engine\io;$(ProjectDir)DirectXGame\engine\math;$(ProjectDir)DirectXGame\engine\pipeline;$(ProjectDir)DirectXGame\engine\scene;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+      <LinkTimeCodeGeneration />
+    </Link>
+    <Manifest>
+      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+    </Manifest>
+    <PostBuildEvent>
+      <Command>   copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="DirectXGame\engine\audio\Audio.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\Camera.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\D3DResourceLeakChecker.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\DebugCamera.cpp" />
+    <ClCompile Include="DirectXGame\engine\io\DirectInput.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\DirectionalLight.cpp" />
+    <ClCompile Include="externals\imgui\imgui.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_demo.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_draw.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_impl_dx12.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_impl_win32.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_tables.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="externals\imgui\imgui_widgets.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\base\FrameRateController.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\GraphicsDevice.cpp" />
+    <ClCompile Include="DirectXGame\main.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\pipeline\BlendState.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\BufferResource.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\CommandContext.cpp" />
+    <ClCompile Include="DirectXGame\engine\pipeline\DepthStencilState.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\DepthStencilView.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\DescriptorHeap.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\DxcCompiler.cpp" />
+    <ClCompile Include="DirectXGame\engine\editor\EditorObject.cpp" />
+    <ClCompile Include="DirectXGame\engine\pipeline\InputLayout.cpp" />
+    <ClCompile Include="DirectXGame\engine\io\Logger.cpp" />
+    <ClCompile Include="DirectXGame\engine\math\Matrix3x3.cpp" />
+    <ClCompile Include="DirectXGame\engine\math\Matrix4x4.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\Model.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\ModelLoader.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\Object3D.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\ParticleSystem.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\Primitive3D.cpp" />
+    <ClCompile Include="DirectXGame\engine\pipeline\PipelineState.cpp" />
+    <ClCompile Include="DirectXGame\engine\pipeline\RasterizerState.cpp" />
+    <ClCompile Include="DirectXGame\engine\pipeline\RootSignature.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\SceneRenderTexture.cpp" />
+    <ClCompile Include="DirectXGame\engine\pipeline\ShaderProgram.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\ShaderResourceView.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\Sphere.cpp" />
+    <ClCompile Include="DirectXGame\engine\2d\Sprite.cpp" />
+    <ClCompile Include="DirectXGame\engine\io\StringUtility.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\TextureManager.cpp" />
+    <ClCompile Include="DirectXGame\engine\math\Vector.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\VertexBuffer.cpp" />
+    <ClCompile Include="DirectXGame\engine\base\Window.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="resources\shaders\Object3d.PS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Pixel</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\shaders\Object3d.VS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Vertex</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DirectXGame\engine\audio\Audio.h" />
+    <ClInclude Include="DirectXGame\engine\pipeline\BlendState.h" />
+    <ClInclude Include="DirectXGame\engine\base\BufferResource.h" />
+    <ClInclude Include="DirectXGame\engine\3d\Camera.h" />
+    <ClInclude Include="DirectXGame\engine\math\Collision.h" />
+    <ClInclude Include="DirectXGame\engine\base\CommandContext.h" />
+    <ClInclude Include="DirectXGame\engine\base\D3DResourceLeakChecker.h" />
+    <ClInclude Include="DirectXGame\engine\3d\DebugCamera.h" />
+    <ClInclude Include="DirectXGame\engine\pipeline\DepthStencilState.h" />
+    <ClInclude Include="DirectXGame\engine\base\DepthStencilView.h" />
+    <ClInclude Include="DirectXGame\engine\base\DescriptorHeap.h" />
+    <ClInclude Include="DirectXGame\engine\io\DirectInput.h" />
+    <ClInclude Include="DirectXGame\engine\3d\DirectionalLight.h" />
+    <ClInclude Include="DirectXGame\engine\base\DxcCompiler.h" />
+    <ClInclude Include="DirectXGame\engine\editor\EditorObject.h" />
+    <ClInclude Include="externals\imgui\imconfig.h" />
+    <ClInclude Include="externals\imgui\imgui.h" />
+    <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
+    <ClInclude Include="externals\imgui\imgui_impl_win32.h" />
+    <ClInclude Include="externals\imgui\imgui_internal.h" />
+    <ClInclude Include="externals\imgui\imstb_rectpack.h" />
+    <ClInclude Include="externals\imgui\imstb_textedit.h" />
+    <ClInclude Include="externals\imgui\imstb_truetype.h" />
+    <ClInclude Include="DirectXGame\engine\base\FrameRateController.h" />
+    <ClInclude Include="DirectXGame\engine\base\GraphicsDevice.h" />
+    <ClInclude Include="DirectXGame\engine\pipeline\InputLayout.h" />
+    <ClInclude Include="DirectXGame\engine\3d\Material.h" />
+    <ClInclude Include="DirectXGame\engine\math\Matrix3x3.h" />
+    <ClInclude Include="DirectXGame\engine\math\Matrix4x4.h" />
+    <ClInclude Include="DirectXGame\engine\io\Logger.h" />
+    <ClInclude Include="DirectXGame\engine\3d\Model.h" />
+    <ClInclude Include="DirectXGame\engine\3d\ModelLoader.h" />
+    <ClInclude Include="DirectXGame\engine\3d\Object3D.h" />
+    <ClInclude Include="DirectXGame\engine\3d\ParticleSystem.h" />
+    <ClInclude Include="DirectXGame\engine\3d\Primitive3D.h" />
+    <ClInclude Include="DirectXGame\engine\pipeline\PipelineState.h" />
+    <ClInclude Include="DirectXGame\engine\pipeline\RasterizerState.h" />
+    <ClInclude Include="DirectXGame\engine\pipeline\RootSignature.h" />
+    <ClInclude Include="DirectXGame\engine\base\SceneRenderTexture.h" />
+    <ClInclude Include="DirectXGame\engine\pipeline\ShaderProgram.h" />
+    <ClInclude Include="DirectXGame\engine\base\ShaderResourceView.h" />
+    <ClInclude Include="DirectXGame\engine\3d\Sphere.h" />
+    <ClInclude Include="DirectXGame\engine\2d\Sprite.h" />
+    <ClInclude Include="DirectXGame\engine\io\StringUtility.h" />
+    <ClInclude Include="DirectXGame\engine\base\TextureManager.h" />
+    <ClInclude Include="DirectXGame\engine\3d\TransformationMatrix.h" />
+    <ClInclude Include="DirectXGame\engine\math\Vector.h" />
+    <ClInclude Include="DirectXGame\engine\3d\VertexBuffer.h" />
+    <ClInclude Include="DirectXGame\engine\3d\VertexData.h" />
+    <ClInclude Include="DirectXGame\engine\base\Window.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Memo.txt" />
+    <Text Include="externals\imgui\LICENSE.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="resources\shaders\Object3d.hlsli" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
+      <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
