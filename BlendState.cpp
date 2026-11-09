@@ -1,5 +1,5 @@
 #include "BlendState.h"
-#include <assert.h>
+#include <cassert>
 
 /// <summary>
 /// 初期化

@@ -10,12 +10,12 @@ PipelineState::~PipelineState() {
 
 /// <summary>
 /// 初期化
-/// 描画に必要なPSOを作成
+/// 全てのBlendMode分のPSOを作成
 /// </summary>
 /// <param name="device"></param>
+/// <param name="dxcCompiler"></param>
 /// <param name="logStream"></param>
-/// <param name="blendMode"></param>
-void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream, BlendMode blendMode) {
+void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream) {
 
 	/// --- RootSignature ---
 
@@ -26,11 +26,6 @@ void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, s
 
 	// 頂点データの並びを設定
 	inputLayout_.Initialize();
-
-	/// --- BlendState ---
-
-	// 色の書き込み方法を設定
-	blendState_.Initialize(blendMode);
 
 	/// --- RasterizerState ---
 
@@ -49,13 +44,12 @@ void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, s
 
 	/// --- GraphicsPipelineState ---
 
-	// PSOを生成する
+	// BlendMode以外の共通設定をまとめる
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc{};
 	graphicsPipelineStateDesc.pRootSignature = rootSignature_.Get(); // RootSignature
 	graphicsPipelineStateDesc.InputLayout = inputLayout_.GetDesc(); // InputLayout
 	graphicsPipelineStateDesc.VS = shaderProgram_.GetVertexShaderByteCode(); // VertexShader
 	graphicsPipelineStateDesc.PS = shaderProgram_.GetPixelShaderByteCode(); // PixelShader
-	graphicsPipelineStateDesc.BlendState = blendState_.GetDesc(); // BlendState
 	graphicsPipelineStateDesc.RasterizerState = rasterizerState_.GetDesc(); // RasterizerState
 	// DepthStencilの設定、Depthを使いますよという意思表示
 	graphicsPipelineStateDesc.DepthStencilState = depthStencilState_.GetDesc();
@@ -69,12 +63,23 @@ void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, s
 	// どのように画面に色を打ち込むかの設定
 	graphicsPipelineStateDesc.SampleDesc.Count = 1;
 	graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-	// 実際に生成
-	HRESULT hr = device->CreateGraphicsPipelineState(
-		&graphicsPipelineStateDesc,
-		IID_PPV_ARGS(graphicsPipelineState_.GetAddressOf())
-	);
-	assert(SUCCEEDED(hr));
+
+	/// --- BlendModeごとのPSO ---
+
+	// BlendStateだけを差し替えて、BlendModeの数だけPSOを生成する
+	for (size_t i = 0; i < graphicsPipelineStates_.size(); ++i) {
+		// BlendModeに合わせて色の書き込み方法を設定
+		BlendState blendState;
+		blendState.Initialize(static_cast<BlendMode>(i));
+		graphicsPipelineStateDesc.BlendState = blendState.GetDesc();
+
+		// 実際に生成
+		HRESULT hr = device->CreateGraphicsPipelineState(
+			&graphicsPipelineStateDesc,
+			IID_PPV_ARGS(graphicsPipelineStates_[i].GetAddressOf())
+		);
+		assert(SUCCEEDED(hr));
+	}
 }
 
 /// --- 終了処理 ---

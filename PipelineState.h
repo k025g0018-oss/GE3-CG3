@@ -7,6 +7,7 @@
 #include "RootSignature.h"
 #include "ShaderProgram.h"
 
+#include <array>
 #include <d3d12.h>
 #include <wrl.h>
 #include <ostream>
@@ -26,19 +27,21 @@ public:
 
 	/// <summary>
 	/// 初期化
-	/// 指定したBlendModeで描画に必要なPSOを作成
+	/// 全てのBlendMode分のPSOを作成
 	/// </summary>
 	/// <param name="device"></param>
+	/// <param name="dxcCompiler"></param>
 	/// <param name="logStream"></param>
-	/// <param name="blendMode"></param>
-	void Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream, BlendMode blendMode = BlendMode::kNone);
+	void Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream);
 
 	/// --- 取得 ---
 	// 作成したRootSignatureを取得
 	ID3D12RootSignature* GetRootSignature() const { return rootSignature_.Get(); }
 
-	// 作成したPSOを取得
-	ID3D12PipelineState* GetPipelineState() const { return graphicsPipelineState_.Get(); }
+	// 指定したBlendModeのPSOを取得
+	ID3D12PipelineState* GetPipelineState(BlendMode blendMode) const {
+		return graphicsPipelineStates_[static_cast<size_t>(blendMode)].Get();
+	}
 
 	/// --- 終了処理 ---
 	// PSOで使用したリソースを解放
@@ -47,10 +50,9 @@ public:
 private:
 	RootSignature rootSignature_;
 	InputLayout inputLayout_;
-	BlendState blendState_;
 	RasterizerState rasterizerState_;
 	DepthStencilState depthStencilState_;
 	ShaderProgram shaderProgram_;
-	// PipelineStateの寿命をComPtrで管理する
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+	// BlendModeごとのPSO (寿命をComPtrで管理する)
+	std::array<Microsoft::WRL::ComPtr<ID3D12PipelineState>, static_cast<size_t>(BlendMode::kCountOf)> graphicsPipelineStates_;
 };

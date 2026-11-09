@@ -848,16 +848,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// GraphicsDeviceが作ったRTVの設定を借りる (Scene用テクスチャのフォーマットに使う)
 		const D3D12_RENDER_TARGET_VIEW_DESC& rtvDesc = graphicsDevice->GetRtvDesc();
 
-		///// ----- PSO(Pipeline State Object) ----- /////
+		///// ----- PSO (Pipeline State Object) ----- /////
 
 		/// --- 初期化 ---
-		// RootSignatureと各設定をまとめてPSOを作成する
+
+		// 全てのBlendMode分のPSOをまとめて作成する
 		PipelineState pipelineState;
 		pipelineState.Initialize(device, graphicsDevice->GetDxcCompiler(), logStream);
 
-		// NormalBlend(半透明)で描画するためのPSO
-		PipelineState normalBlendPipelineState;
-		normalBlendPipelineState.Initialize(device, graphicsDevice->GetDxcCompiler(), logStream, BlendMode::kNormal);
+		/// --- BlendMode ---
+
+		// 今使うBlendMode (ImGuiで切り替える)
+		BlendMode currentBlendMode = BlendMode::kNormal;
+
+		///// ----- ===== ----- /////
+
+		///// ----- WVP ----- /////
+
+		/// --- 初期化 ---
 
 		// WVP用のリソースを作る、Matrix4x4 １つ分のサイズを用意する
 		ComPtr<ID3D12Resource> wvpResource;
@@ -870,6 +878,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 単位行列を書き込んでおく
 		wvpData->WVP = Matrix4x4::MakeIdentity4x4();
 		wvpData->World = Matrix4x4::MakeIdentity4x4();
+
+		///// ----- ===== ----- /////
 
 		///// ----- VertexBuffer ----- /////
 
@@ -1540,6 +1550,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			ImGui::End();
 
+			/// --- Audio ---
+
 			ImGui::Begin("Audio");
 
 			// ONになった瞬間にループ再生し、OFFになった瞬間に停止する
@@ -1549,6 +1561,27 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				} else {
 					audio.SoundStopWave();
 				}
+			}
+
+			ImGui::End();
+
+			/// --- BlendMode切り替え ---
+
+			ImGui::Begin("BlendMode");
+
+			// ImGuiでBlendModeを選ぶ
+			const char* blendModeNames[] = {
+				"None",
+				"Normal",
+				"Add",
+				"Subtract",
+				"Multiply",
+				"Screen",
+			};
+			int blendModeIndex = static_cast<int>(currentBlendMode);
+
+			if (ImGui::Combo("BlendMode", &blendModeIndex, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+				currentBlendMode = static_cast<BlendMode>(blendModeIndex);
 			}
 
 			ImGui::End();
@@ -2180,8 +2213,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// RootSignatureの設定
 			commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
-			// PSOの設定
-			commandList->SetPipelineState(pipelineState.GetPipelineState());
+			// PSOの設定 (不透明)
+			commandList->SetPipelineState(pipelineState.GetPipelineState(BlendMode::kNone));
 			// 頂点バッファビューの設定
 			const D3D12_VERTEX_BUFFER_VIEW& vertexBufferView = vertexBuffer.GetView();
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
@@ -2219,6 +2252,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			///// ----- Sprite描画 ----- /////
 
 			/// --- Sphere描画 ---
+
 			if (isSphereVisible) {
 				// 表示中だけ選択されたTextureでSphereを描画する
 				const D3D12_GPU_DESCRIPTOR_HANDLE sphereTextureHandle =
@@ -2228,14 +2262,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			/// --- OBJ平面描画 ---
+
 			if (isPlaneVisible) {
 				// 平面モデルで使用するTextureを取得する
 				const D3D12_GPU_DESCRIPTOR_HANDLE planeTextureHandle =
 					textureManager.GetSrvHandle(
 						static_cast<uint32_t>(planeTextureMode));
 
-				// 半透明にするため、NormalBlendのPSOに切り替える
-				commandList->SetPipelineState(normalBlendPipelineState.GetPipelineState());
+				// 選択中のBlendModeのPSOに切り替える
+				commandList->SetPipelineState(pipelineState.GetPipelineState(currentBlendMode));
 
 				// OBJから読み込んだ平面を描画する
 				planeModel.Draw(
@@ -2243,10 +2278,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					planeTextureHandle);
 
 				// ほかの不透明な物体のために、合成なしのPSOに戻す
-				commandList->SetPipelineState(pipelineState.GetPipelineState());
+				commandList->SetPipelineState(pipelineState.GetPipelineState(BlendMode::kNone));
 			}
 
 			/// --- Axisモデル描画 ---
+
 			if (isAxisVisible) {
 				// Axisモデルで使用するTextureを取得する
 				const D3D12_GPU_DESCRIPTOR_HANDLE axisTextureHandle =
@@ -2260,6 +2296,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			/// --- MultiMeshモデル描画 ---
+
 			if (isMultiMeshVisible) {
 				// MultiMeshモデルで使用するTextureを取得する
 				const D3D12_GPU_DESCRIPTOR_HANDLE multiMeshTextureHandle =
@@ -2274,6 +2311,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			/// --- MultiMaterialモデル描画 ---
+
 			if (isMultiMaterialVisible) {
 				// MeshごとにMTLで指定されたTextureを使って描画する
 				multiMaterialModel.DrawWithMaterials(
@@ -2350,6 +2388,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///// ----- 解放処理 ----- /////
 
 		/// --- 1_各種バッファ・テクスチャ・リソース(すべてdeviceより前) ---
+
 		vertexBuffer.Finalize();
 
 		primitive3D.Finalize();
@@ -2370,13 +2409,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		textureManager.Finalize();
 
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
-		pipelineState.Finalize();
-		normalBlendPipelineState.Finalize();
 
-		/// --- 5_スワップチェーンとバックバッファリソース ///
+		pipelineState.Finalize();
+
+		/// --- 5_スワップチェーンとバックバッファリソース ---
+
 		// ReportLiveObjectsより前にComPtrが所有するオブジェクトを解放する
 
 		/// --- 8_すべての依存リソースが消えたので解放 ---
+
 		// ComPtrへ変更したCOMオブジェクトのReleaseは不要
 
 		// DX12リソースがなくなった後にウィンドウを閉じる

@@ -232,3 +232,17 @@ vertexData[index].normal.z = vertexData[index].position.z;
 
 Spriteは-zの方向を向きとしておくと良い
 vertexDataSprite[0].normal = {0.0f, 0.0f, -1.0f};
+
+///// ----- ===== ----- /////
+
+WVPリソースはPSOの部品ではない
+PSOの部品は、PipelineState クラスの中にあるものだけです。
+
+RootSignature
+InputLayout
+BlendState
+RasterizerState
+ShaderProgram
+DepthStencilState
+
+///// ----- ===== ----- /////
