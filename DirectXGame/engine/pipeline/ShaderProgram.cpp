@@ -17,10 +17,10 @@ void ShaderProgram::Initialize(DxcCompiler* dxcCompiler, std::ostream& logStream
 	assert(dxcCompiler);
 
 	// ShaderをCompileする
-	vertexShaderBlob_ = dxcCompiler->CompileShader(L"Object3D.VS.hlsl", L"vs_6_0", logStream);
+	vertexShaderBlob_ = dxcCompiler->CompileShader(L"resources/shaders/Object3D.VS.hlsl", L"vs_6_0", logStream);
 	assert(vertexShaderBlob_ != nullptr);
 
-	pixelShaderBlob_ = dxcCompiler->CompileShader(L"Object3D.PS.hlsl", L"ps_6_0", logStream);
+	pixelShaderBlob_ = dxcCompiler->CompileShader(L"resources/shaders/Object3D.PS.hlsl", L"ps_6_0", logStream);
 	assert(pixelShaderBlob_ != nullptr);
 }
 
