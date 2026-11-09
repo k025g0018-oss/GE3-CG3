@@ -8,6 +8,11 @@
 enum class BlendMode {
 	kNone, // 合成しない (不透明)
 	kNormal, // NormalBlend (αで半透明)
+	kAdd, // 加算 Src * SrcA + Dest * 1
+	kSubtract, // 減算 Dest * 1 - Src * SrcA
+	kMultiply, // 乗算 Src * 0 + Dest * Src
+	kScreen, // スクリーン Src * (1 - Dest) + Dest * 1
+	kCountOf, // BlendModeの数 (ブレンドモードとして利用してはいけない)
 };
 
 ///// ----- ===== ----- /////
