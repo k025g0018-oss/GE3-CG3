@@ -920,28 +920,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		materialData->uvTransform =
 			Matrix4x4::MakeIdentity4x4();
 
-		/// --- 平行光源用の定数バッファを作成する ---
-		ComPtr<ID3D12Resource> directionalLightResource;
-		// Createが返した所有権をComPtrへ移す
-		directionalLightResource = graphicsDevice->CreateBufferResource(sizeof(DirectionalLight));
-		// CPUから光源情報を書き込むアドレス
-		DirectionalLight* directionalLightData = nullptr;
-		HRESULT directionalLightMapResult =
-			directionalLightResource->Map(
-				0,
-				nullptr,
-				reinterpret_cast<void**>(&directionalLightData));
-
-		assert(SUCCEEDED(directionalLightMapResult));
-
-		// デフォルト値
-		// 平行光源の色を白に設定する
-		directionalLightData->color = {1.0f, 1.0f, 1.0f, 1.0f};
-		// 真下へ進む単位ベクトルを設定する
-		directionalLightData->direction = {0.0f, -1.0f, 0.0f};
-		// 平行光源の明るさを設定する
-		directionalLightData->intensity = 1.0f;
-
 		/// --- Resourceのデータを書き込む ---
 		// データを書き込む
 		VertexData* vertexData = vertexBuffer.GetData();
@@ -975,6 +953,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		for (uint32_t i = 0; i < 12; ++i) {
 			vertexData[i] = pyramidVertices[i];
 		}
+
+		///// ----- 平行光源 ----- /////
+
+		/// --- 初期化 ---
+		// 平行光源の定数バッファを作成し、初期値を書き込む
+		DirectionalLight directionalLight;
+		directionalLight.Initialize(device);
+
+		///// ----- ===== ----- /////
 
 		///// ----- TextureManager ----- /////
 
@@ -1475,46 +1462,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			ImGui::Separator();
 
-			// 光源色を変更する
-			ImGui::ColorEdit4(
-				"Light Color",
-				&directionalLightData->color.x);
-
-			// 光の進む方向を変更する
-			const bool directionChanged = ImGui::DragFloat3(
-				"Light Direction",
-				&directionalLightData->direction.x,
-				0.01f,
-				-1.0f,
-				1.0f);
-
-			// 光源の輝度を変更する
-			ImGui::DragFloat(
-				"Light Intensity",
-				&directionalLightData->intensity,
-				0.01f,
-				0.0f,
-				10.0f);
-
-			// 方向が変更されたら必ず単位ベクトルへ正規化する
-			if (directionChanged) {
-				Vector3& direction = directionalLightData->direction;
-
-				const float length = std::sqrt(
-					direction.x * direction.x +
-					direction.y * direction.y +
-					direction.z * direction.z);
-
-				// ゼロベクトルは正規化できないため除外する
-				if (length > 0.0001f) {
-					direction.x /= length;
-					direction.y /= length;
-					direction.z /= length;
-				} else {
-					// 不正な方向になった場合は真下へ戻す
-					direction = {0.0f, -1.0f, 0.0f};
-				}
-			}
+			// 光源の色・向き・明るさを調整
+			directionalLight.DrawImGui();
 
 			ImGui::End();
 
@@ -1829,7 +1778,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// wvp用のBufferの場所を設定
 			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 			// 平行光源をPixel Shaderのb1へ設定する
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+			directionalLight.Bind(commandList, 3);
 
 			// 画像を指定
 			D3D12_GPU_DESCRIPTOR_HANDLE currentTextureHandle =
