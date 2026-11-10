@@ -26,6 +26,8 @@
 #include "Window.h"
 #include "GraphicsDevice.h"
 #include "D3DResourceLeakChecker.h"
+#include "InstancingParticle.h"
+#include "PrimitiveMesh.h"
 
 #include <cstdint> // int32_t
 #include <string> // 文字列
@@ -885,6 +887,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///// ----- Sprite ----- /////
 
 		///// ----- 初期化 ----- /////
+
 		/// --- Sprite専用のVertexBuffer、Material、WVPを作成 ---
 		// 2D専用オブジェクトであることが分かる名前に統一する
 		Sprite2D sprite2D;
@@ -1264,6 +1267,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- ===== ----- /////
 
+		///// ----- Instancing Particle ----- /////
+
+		/// --- 初期化 ---
+		// 板パーティクルの最大数
+		constexpr uint32_t kPlaneParticleMaxCount = 10;
+
+		// 板をDrawInstancedでまとめて描画する
+		InstancingParticle instancingParticle;
+		instancingParticle.Initialize(device, PrimitiveMesh::CreateQuad(), kPlaneParticleMaxCount);
+
+		// 表示の切り替え
+		bool isInstancingParticleVisible = true;
+
+		// 貼るテクスチャの番号 (最初uvChecker)
+		int instancingParticleTextureMode = 1;
+
+		///// ----- ===== ----- /////
+
 		///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 		// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1359,6 +1380,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			fenceTextureMode,
 			isFenceVisible);
 
+		// InstancingParticleをHierarchyとPropertiesへ接続する
+		InstancingParticleEditorObject instancingParticleEditor(
+			instancingParticle,
+			"Instancing Particle",
+			instancingParticleTextureMode,
+			isInstancingParticleVisible);
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1378,6 +1406,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&teapotModelEditor,
 			&suzanneModelEditor,
 			&fenceModelEditor,
+			&instancingParticleEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1639,7 +1668,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				isTeapotVisible,
 				isSuzanneVisible,
 				isFenceVisible,
-				isSpriteVisible);
+				isSpriteVisible
+			);
 			DrawFlowGraph(particleSystem, primitive3D);
 
 #endif // USE_IMGUI
@@ -1785,6 +1815,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			fenceModel.Update(
 				viewMatrix,
 				projectionMatrix);
+
+			// Instancing ParticleのWVPを更新する
+			instancingParticle.Update(viewMatrix, projectionMatrix);
 
 			/// --- Object3D用WVPを計算する ---
 
@@ -1997,6 +2030,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				fenceModel.Draw(
 					commandList,
 					fenceTextureHandle);
+			}
+
+			/// --- Instancing Particle描画 ---
+
+			if (isInstancingParticleVisible) {
+				// ImGuiで選択したテクスチャを貼って描画する
+				instancingParticle.Draw(
+					commandList,
+					textureManager.GetSrvHandle(static_cast<uint32_t>(instancingParticleTextureMode)));
 			}
 
 			/// --- Texture ---

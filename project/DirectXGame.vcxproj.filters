@@ -184,6 +184,15 @@
     <ClCompile Include="DirectXGame\main.cpp">
       <Filter>DirectXGame</Filter>
     </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\PrimitiveMesh.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\InstancingParticle.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\ParticleEffect.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\shaders\Object3d.VS.hlsl" />
@@ -339,6 +348,15 @@
     </ClInclude>
     <ClInclude Include="DirectXGame\engine\editor\EditorObject.h">
       <Filter>DirectXGame\engine\editor</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\PrimitiveMesh.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\InstancingParticle.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\ParticleEffect.h">
+      <Filter>DirectXGame\engine\3d</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

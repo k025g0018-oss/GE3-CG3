@@ -7,6 +7,7 @@
 #include "Sprite.h"
 #include "Sphere.h"
 #include "Model.h"
+#include "InstancingParticle.h"
 
 // ゲームオブジェクトをImGuiのHierarchyとPropertiesへ接続する共通ラッパー
 class IEditorObject {
@@ -145,6 +146,39 @@ public:
 
 private:
 	Primitive3D& object_;
+};
+
+// InstancingParticleをHierarchyとPropertiesへ接続するラッパークラス
+class InstancingParticleEditorObject final : public IEditorObject {
+public:
+	InstancingParticleEditorObject(
+		InstancingParticle& particle,
+		const char* name,
+		int& textureMode,
+		bool& isVisible
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 描画本体は所有せず、mainで作成したInstancingParticleを参照する
+	InstancingParticle& particle_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
+
+	// Texture選択番号をmainと共有する
+	int& textureMode_;
+
+	// Editorへ接続した時点のSRTをリセット先として保存する
+	Transform initialTransform_{};
+
+	// 描画するかどうかをmainと共有する
+	bool& isVisible_;
 };
 
 #endif // USE_IMGUI

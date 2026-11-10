@@ -246,3 +246,32 @@ ShaderProgram
 DepthStencilState
 
 ///// ----- ===== ----- /////
+
+std::vector<std::unique_ptr<InstancingParticle>> groups_;
+
+外側から順に分解するとこうなります。
+
+std::vector<…>：数を後から増やせる配列
+std::unique_ptr<InstancingParticle>：InstancingParticle を指すポインタで、持ち主が1人だけのもの。持ち主が消えると、指している InstancingParticle も自動で delete される
+「InstancingParticle を、後から何個でも追加できるリスト」
+
+unique_ptr で包めば、vector が引っ越すときに動くのはポインタだけです。本体（とその GPU リソース）は動きません。
+
+for (… group : groups_)
+
+「範囲 for 文」といって、groups_ の要素を先頭から1つずつ取り出して処理する書き方です。工数（手間）の意味ではありません。
+
+for (std::unique_ptr<InstancingParticle>& group : groups_) {
+	group->Update(viewMatrix, projectionMatrix);
+}
+
+group は、1周ごとに groups_[0]、groups_[1]、groups_[2]… を順に指します。グループが3つなら3回まわって、3つとも Update されます。次のように書くのと同じ意味です。
+
+cpp
+for (size_t i = 0; i < groups_.size(); ++i) {
+	groups_[i]->Update(viewMatrix, projectionMatrix);
+}
+
+group はポインタなので、メンバー関数は . ではなく -> で呼びます。
+
+///// ----- ===== ----- /////

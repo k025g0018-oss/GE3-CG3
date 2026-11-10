@@ -243,6 +243,7 @@ void SceneSettingsEditorObject::DrawProperties() {
 }
 
 ///// ----- Sphere ----- /////
+
 SphereEditorObject::SphereEditorObject(
 	Sphere& sphere,
 	int& textureMode,
@@ -336,7 +337,10 @@ void SphereEditorObject::DrawProperties() {
 	}
 }
 
+///// ----- ===== ----- /////
+
 ///// ----- OBJ Model ----- /////
+
 ModelEditorObject::ModelEditorObject(
 	Model& model,
 	const char* name,
@@ -479,5 +483,71 @@ void ModelEditorObject::DrawProperties() {
 		ImGui::PopID();
 	}
 }
+
+///// ----- ===== ----- /////
+
+///// ----- InstancingParticle ----- /////
+
+InstancingParticleEditorObject::InstancingParticleEditorObject(
+	InstancingParticle& particle,
+	const char* name,
+	int& textureMode,
+	bool& isVisible)
+	: particle_(particle),
+	name_(name),
+	textureMode_(textureMode),
+	initialTransform_(particle.GetTransform()),
+	isVisible_(isVisible) {
+}
+
+void InstancingParticleEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Instancing Particle Control");
+
+	// 描画をON/OFFする
+	ImGui::Checkbox("Draw Particle", &isVisible_);
+
+	/// --- 描画数 ---
+
+	// 1～最大数の範囲で描画数を変更する
+	const uint32_t minCount = 1;
+	const uint32_t maxCount = particle_.GetMaxInstanceCount();
+	ImGui::SliderScalar(
+		"Instance Count",
+		ImGuiDataType_U32,
+		&particle_.GetInstanceCount(),
+		&minCount,
+		&maxCount
+	);
+
+	/// --- 見た目 ---
+
+	// 粒共通の色を変更する
+	ImGui::ColorEdit4("Particle Color", &particle_.GetColor().x);
+
+	// 粒へ貼るTextureを選択する
+	ImGui::Combo(
+		"Texture Mode",
+		&textureMode_,
+		kTextureModes,
+		IM_ARRAYSIZE(kTextureModes)
+	);
+
+	ImGui::Separator();
+
+	/// --- Transform ---
+
+	// 全体の拡縮・回転・移動を変更する
+	Transform& transform = particle_.GetTransform();
+
+	ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+	ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
+	ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
+
+	if (ImGui::Button("Reset SRT")) {
+		transform = initialTransform_;
+	}
+}
+
+///// ----- ===== ----- /////
 
 #endif // USE_IMGUI
