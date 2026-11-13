@@ -669,4 +669,81 @@ void ParticleEffectEditorObject::DrawProperties() {
 	}
 }
 
+///// ----- ===== ----- /////
+
+///// ----- MouseParticleEffect ----- /////
+
+MouseParticleEffectEditorObject::MouseParticleEffectEditorObject(
+	MouseParticleEffect& effect,
+	const char* name,
+	bool& isVisible)
+	: effect_(effect),
+	name_(name),
+	isVisible_(isVisible) {
+}
+
+void MouseParticleEffectEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Mouse Particle Effect Control");
+
+	// 描画をON/OFFする
+	ImGui::Checkbox("Draw Effect", &isVisible_);
+
+	/// --- カーソルの輪 ---
+
+	ImGui::SeparatorText("Cursor");
+
+	// カーソルの位置に輪を表示するか
+	ImGui::Checkbox("Show Cursor", &effect_.GetIsCursorVisible());
+
+	// 輪の色と大きさ
+	InstancingParticle& cursor = effect_.GetCursor();
+	ImGui::ColorEdit4("Cursor Color", &cursor.GetColor().x);
+	ImGui::DragFloat("Cursor Size", &cursor.GetTransform().scale.x, 0.005f, 0.01f, 1.0f);
+	// 縦横同じ大きさにする
+	cursor.GetTransform().scale.y = cursor.GetTransform().scale.x;
+
+	/// --- 飛び散る立方体 ---
+
+	ImGui::SeparatorText("Burst Cube (Click)");
+
+	ParticleGroup& burstGroup = effect_.GetBurstGroup();
+	ParticleGroupSettings& burstSettings = burstGroup.GetSettings();
+
+	// 1回のクリックで出す数
+	const uint32_t minBurstCount = 1;
+	const uint32_t maxBurstCount = 50;
+	ImGui::SliderScalar("Burst Count", ImGuiDataType_U32, &effect_.GetBurstCount(), &minBurstCount, &maxBurstCount);
+
+	// 生きている (描画している) 粒の数を表示する
+	ImGui::Text("Alive Count : %u", burstGroup.GetInstancingParticle().GetAliveCount());
+
+	// 打ち上げる速さ、重力、色の変わる速さ
+	ImGui::DragFloatRange2("Speed", &burstSettings.speedMin, &burstSettings.speedMax, 0.05f, 0.0f, 20.0f);
+	ImGui::DragFloat("Gravity", &burstSettings.acceleration.y, 0.05f, -30.0f, 0.0f);
+	ImGui::DragFloat("Hue Shift Speed", &burstSettings.hueShiftSpeed, 0.01f, 0.0f, 5.0f);
+
+	/// --- カーソルから出る円 ---
+
+	ImGui::SeparatorText("Mouse Trail Circle");
+
+	ParticleGroup& trailGroup = effect_.GetTrailGroup();
+
+	// 円を出す間隔 (秒)
+	ImGui::SliderFloat("Emit Interval", &effect_.GetTrailEmitInterval(), 0.01f, 0.5f, "%.3f s");
+
+	// 生きている (描画している) 粒の数を表示する
+	ImGui::Text("Alive Count : %u", trailGroup.GetInstancingParticle().GetAliveCount());
+
+	// 円の色
+	ImGui::ColorEdit4("Trail Color", &trailGroup.GetSettings().tintColor.x);
+
+	/// --- リセット ---
+
+	// 出ている粒を全て消す
+	if (ImGui::Button("Clear")) {
+		burstGroup.Randomize();
+		trailGroup.Randomize();
+	}
+}
+
 #endif // USE_IMGUI

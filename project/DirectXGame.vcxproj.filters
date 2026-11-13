@@ -196,6 +196,9 @@
     <ClCompile Include="DirectXGame\engine\3d\ParticleGroup.cpp">
       <Filter>DirectXGame\engine\3d</Filter>
     </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\MouseParticleEffect.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\shaders\Object3d.VS.hlsl" />
@@ -364,6 +367,9 @@
       <Filter>DirectXGame\engine\3d</Filter>
     </ClInclude>
     <ClInclude Include="DirectXGame\engine\3d\ParticleGroup.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\MouseParticleEffect.h">
       <Filter>DirectXGame\engine\3d</Filter>
     </ClInclude>
   </ItemGroup>

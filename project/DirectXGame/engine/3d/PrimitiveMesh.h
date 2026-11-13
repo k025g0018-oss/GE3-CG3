@@ -2,6 +2,7 @@
 
 #include "VertexData.h"
 
+#include <cstdint>
 #include <vector>
 
 ///// ----- プリミティブ形状 ----- /////
@@ -25,6 +26,16 @@ namespace PrimitiveMesh {
 
 	// 2x2x2の立方体 (6面、36頂点)
 	std::vector<VertexData> CreateCube();
+
+	/// --- 円 ---
+
+	// 半径1の塗りつぶした円 (中心から扇形の三角形を並べる)
+	std::vector<VertexData> CreateCircle(uint32_t segmentCount = 32);
+
+	/// --- リング ---
+
+	// 外側の半径1、内側の半径innerRadiusの輪 (中が空いた円、ワイヤーフレームの円の代わり)
+	std::vector<VertexData> CreateRing(float innerRadius = 0.8f, uint32_t segmentCount = 48);
 
 };
 

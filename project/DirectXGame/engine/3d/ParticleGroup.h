@@ -38,6 +38,15 @@ struct ParticleGroupSettings {
 	// 移動の速さ (m/s) 0なら動かない
 	float speedMin = 0.0f;
 	float speedMax = 0.0f;
+	// trueなら上向き (±spreadAngleの範囲) に飛ばす、falseなら画面に沿った全方向に飛ばす
+	bool isUpward = false;
+	// 上向きに飛ばすときの広がり (rad)
+	float spreadAngle = 0.0f;
+
+	// 加速度 (m/s^2) 重力なら {0, -9.8, 0} のように下向きにする
+	Vector3 acceleration{0.0f, 0.0f, 0.0f};
+	// 空気抵抗 (1秒あたりに速度が減る割合の目安) 0なら減速しない
+	float drag = 0.0f;
 
 	// 回転の速さ (rad/s) 0なら回転しない、向きはランダム
 	float angularSpeedMin = 0.0f;
@@ -61,8 +70,21 @@ struct ParticleGroupSettings {
 	// trueなら寿命がなく、消えずにずっと残る
 	bool isImmortal = false;
 
-	// trueなら粒ごとに色をランダムにする (falseならテクスチャの色そのまま)
+	// trueなら自動では発生せず、Emitを呼んだときだけ発生する (クリックで出す粒など)
+	bool isEmitOnDemand = false;
+
+	// trueなら寿命に合わせて小さくなって消える
+	bool isShrinkOverLife = false;
+
+	// trueなら粒ごとに色をランダムにする (falseならtintColor)
 	bool isRandomColor = false;
+	// 色相が1秒で進む量 (1.0で1秒に1周) 0なら色は変わらない (isRandomColorのときだけ使う)
+	float hueShiftSpeed = 0.0f;
+	// isRandomColorがfalseのときの粒の色
+	Vector4 tintColor{1.0f, 1.0f, 1.0f, 1.0f};
+
+	// 描画に使うBlendMode (isSolidのときはkNoneになる)
+	BlendMode blendMode = BlendMode::kAdd;
 
 	// trueなら簡易ライティングで陰影をつける (立体用)
 	bool isLightingEnabled = false;
@@ -127,8 +149,16 @@ public:
 
 	/// <summary>
 	/// 全ての粒を発生させ直す (位置・向き・色などを再抽選する)
+	/// isEmitOnDemandのときは、全ての粒を消す
 	/// </summary>
 	void Randomize();
+
+	/// <summary>
+	/// 指定した位置から粒を発生させる (空いている粒を使う)
+	/// </summary>
+	/// <param name="worldPosition">発生させる位置 (ワールド座標、m)</param>
+	/// <param name="count">発生させる数</param>
+	void Emit(const Vector3& worldPosition, uint32_t count);
 
 	///// ----- ===== ----- /////
 
@@ -156,6 +186,14 @@ public:
 	/// <returns></returns>
 	bool IsSolid() const {
 		return settings_.isSolid;
+	}
+
+	/// <summary>
+	/// Propertiesから設定を操作する
+	/// </summary>
+	/// <returns></returns>
+	ParticleGroupSettings& GetSettings() {
+		return settings_;
 	}
 
 	/// <summary>
@@ -202,6 +240,13 @@ private:
 	/// <returns></returns>
 	float RandomRange(float min, float max);
 
+	/// <summary>
+	/// 色相(0.0～1.0)から、鮮やかな色を作る (HSVのHだけ変えて、S・Vは固定)
+	/// </summary>
+	/// <param name="hue"></param>
+	/// <returns></returns>
+	static Vector4 HueToColor(float hue);
+
 	///// ----- ===== ----- /////
 
 	///// ----- メンバ変数 ----- /////
@@ -212,7 +257,7 @@ private:
 	// 描画を担当するInstancingParticle
 	InstancingParticle instancingParticle_;
 
-	// 描画に使うBlendMode (光るパーティクルなので加算)
+	// 描画に使うBlendMode (設定から決める)
 	BlendMode blendMode_ = BlendMode::kAdd;
 
 	// 乱数生成器

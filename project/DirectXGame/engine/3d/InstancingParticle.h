@@ -36,6 +36,8 @@ struct Particle {
 	Vector3 baseScale{1.0f, 1.0f, 1.0f};
 	// 拡縮の速さ (rad/s) 0なら大きさは変化しない
 	float scalePulseSpeed = 0.0f;
+	// 色相 (0.0～1.0) 色をだんだん変えるときに使う
+	float hue = 0.0f;
 };
 
 ///// ----- ===== ----- /////
