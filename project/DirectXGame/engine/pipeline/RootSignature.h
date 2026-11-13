@@ -16,7 +16,8 @@ public:
 
 	/// --- 初期化 ---
 	// RootSignatureを作成
-	void Initialize(ID3D12Device* device, std::ostream& logStream);
+	// isInstancingがtrueならParticle用 (VertexShaderのt0でStructuredBufferを受け取る)
+	void Initialize(ID3D12Device* device, std::ostream& logStream, bool isInstancing = false);
 
 	/// --- 取得 ---
 	// 作成したRootSignatureを取得

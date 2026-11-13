@@ -11,6 +11,7 @@
 #include <d3d12.h>
 #include <wrl.h>
 #include <ostream>
+#include <string>
 
 // 前方宣言
 class DxcCompiler;
@@ -32,7 +33,16 @@ public:
 	/// <param name="device"></param>
 	/// <param name="dxcCompiler"></param>
 	/// <param name="logStream"></param>
-	void Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream);
+	/// <param name="vertexShaderPath">省略時はObject3dのVertexShader</param>
+	/// <param name="pixelShaderPath">省略時はObject3dのPixelShader</param>
+	/// <param name="isInstancing">trueならParticle用のRootSignatureを使う</param>
+	void Initialize(
+		ID3D12Device* device,
+		DxcCompiler* dxcCompiler,
+		std::ostream& logStream,
+		const std::wstring& vertexShaderPath = L"resources/shaders/Object3d.VS.hlsl",
+		const std::wstring& pixelShaderPath = L"resources/shaders/Object3d.PS.hlsl",
+		bool isInstancing = false);
 
 	/// --- 取得 ---
 	// 作成したRootSignatureを取得

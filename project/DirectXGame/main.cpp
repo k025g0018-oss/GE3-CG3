@@ -845,6 +845,19 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		PipelineState pipelineState;
 		pipelineState.Initialize(device, graphicsDevice->GetDxcCompiler(), logStream);
 
+		/// --- Particle用PSO ---
+
+		// Particle用のShaderとRootSignatureで、全てのBlendMode分のPSOを作成する
+		// RootSignatureはObject3d用とParticle用で別々に作って管理する
+		PipelineState particlePipelineState;
+		particlePipelineState.Initialize(
+			device,
+			graphicsDevice->GetDxcCompiler(),
+			logStream,
+			L"resources/shaders/Particle.VS.hlsl",
+			L"resources/shaders/Particle.PS.hlsl",
+			true);
+
 		/// --- BlendMode ---
 
 		// 今使うBlendMode (ImGuiで切り替える)
@@ -1273,9 +1286,17 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 板パーティクルの最大数
 		constexpr uint32_t kPlaneParticleMaxCount = 10;
 
+		// Instancing用SRVの番号 (0:ImGui、1～6:Texture、7:Scene画面 の次の空いている番号)
+		constexpr uint32_t kInstancingParticleSrvIndex = 1 + TextureManager::kTextureCount + 1;
+
 		// 板をDrawInstancedでまとめて描画する
 		InstancingParticle instancingParticle;
-		instancingParticle.Initialize(device, PrimitiveMesh::CreateQuad(), kPlaneParticleMaxCount);
+		instancingParticle.Initialize(
+			device,
+			srvDescriptorHeap,
+			kInstancingParticleSrvIndex,
+			PrimitiveMesh::CreateQuad(),
+			kPlaneParticleMaxCount);
 
 		// 表示の切り替え
 		bool isInstancingParticleVisible = true;
@@ -2035,10 +2056,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- Instancing Particle描画 ---
 
 			if (isInstancingParticleVisible) {
+				// Particle用のRootSignatureとPSOに切り替える
+				commandList->SetGraphicsRootSignature(particlePipelineState.GetRootSignature());
+				commandList->SetPipelineState(particlePipelineState.GetPipelineState(BlendMode::kNone));
+
 				// ImGuiで選択したテクスチャを貼って描画する
 				instancingParticle.Draw(
 					commandList,
 					textureManager.GetSrvHandle(static_cast<uint32_t>(instancingParticleTextureMode)));
+
+				// 後に描くSpriteのために、Object3d用のRootSignatureとPSOへ戻す
+				commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
+				commandList->SetPipelineState(pipelineState.GetPipelineState(BlendMode::kNone));
+				// RootSignatureを切り替えると設定が消えるため、平行光源を設定し直す
+				directionalLight.Bind(commandList, 3);
 			}
 
 			/// --- Texture ---
@@ -2092,6 +2123,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 
 		pipelineState.Finalize();
+		particlePipelineState.Finalize();
 
 		/// --- 5_スワップチェーンとバックバッファリソース ---
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DescriptorHeap.h"
 #include "Material.h"
 #include "Matrix4x4.h"
 #include "TransformationMatrix.h"
@@ -31,13 +32,20 @@ public:
 	/// 初期化
 	/// </summary>
 	/// <param name="device"></param>
+	/// <param name="srvDescriptorHeap">Instancing用のSRVを作るヒープ</param>
+	/// <param name="srvIndex">ヒープの空いている番号</param>
 	/// <param name="vertices">PrimitiveMeshで作った形状</param>
 	/// <param name="maxInstanceCount">このパーティクルの最大数</param>
-	void Initialize(ID3D12Device* device, const std::vector<VertexData>& vertices, uint32_t maxInstanceCount);
+	void Initialize(
+		ID3D12Device* device,
+		const DescriptorHeap& srvDescriptorHeap,
+		uint32_t srvIndex,
+		const std::vector<VertexData>& vertices,
+		uint32_t maxInstanceCount);
 
 	/// <summary>
 	/// 更新
-	/// Transformからwvp行列を作る
+	/// 粒ごとのTransformからwvp行列を作り、StructuredBufferへ書き込む
 	/// </summary>
 	/// <param name="viewMatrix"></param>
 	/// <param name="projectionMatrix"></param>
@@ -113,10 +121,17 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	Material* materialData_ = nullptr;
 
-	// インスタンスで1つのwvpを共有する
-	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
-	TransformationMatrix* wvpData_ = nullptr;
+	// 粒ごとのTransform (最大数分)
+	std::vector<Transform> instanceTransforms_;
 
+	// 粒ごとのwvp・Worldを並べたStructuredBuffer
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_;
+	TransformationMatrix* instancingData_ = nullptr;
+
+	// StructuredBufferをシェーダーから読むためのSRV
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU_{};
+
+	// 全体をまとめて動かす親のTransform
 	Transform transform_{
 		{1.0f, 1.0f, 1.0f},
 		{0.0f, 0.0f, 0.0f},

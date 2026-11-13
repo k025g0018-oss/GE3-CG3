@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <dxcapi.h>
 #include <ostream>
+#include <string>
 #include <wrl.h>
 
 // 前方宣言
@@ -19,8 +20,12 @@ public:
 	ShaderProgram& operator=(const ShaderProgram&) = delete;
 
 	/// --- 初期化 ---
-	// 借りたDXCでVertexShaderとPixelShaderをコンパイル
-	void Initialize(DxcCompiler* dxcCompiler, std::ostream& logStream);
+	// 借りたDXCで、指定されたVertexShaderとPixelShaderをコンパイル
+	void Initialize(
+		DxcCompiler* dxcCompiler,
+		std::ostream& logStream,
+		const std::wstring& vertexShaderPath,
+		const std::wstring& pixelShaderPath);
 
 	/// --- 取得 ---
 	// VertexShaderのByteCodeを取得

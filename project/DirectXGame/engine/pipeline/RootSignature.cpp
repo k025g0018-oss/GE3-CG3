@@ -12,7 +12,7 @@ RootSignature::~RootSignature() {
 
 /// --- 初期化 ---
 // RootSignatureを作成
-void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream) {
+void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream, bool isInstancing) {
 	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
 	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
@@ -23,6 +23,14 @@ void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream) {
 	descriptorRange[0].NumDescriptors = 1; // 数は1つ
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // SRVを使う
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
+
+	/// --- DescriptorRange (Instancing) ---
+	// Instancing用のStructuredBufferをVertexShaderのt0で受け取る
+	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+	descriptorRangeForInstancing[0].BaseShaderRegister = 0; // 0から始まる
+	descriptorRangeForInstancing[0].NumDescriptors = 1; // 数は1つ
+	descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // SRVを使う
+	descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
 
 	/// --- Sampler ---
 	// Samplerの設定
@@ -45,9 +53,18 @@ void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream) {
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; // レジスタ番号0とバインド
 
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // VertexShaderで使う
-	rootParameters[1].Descriptor.ShaderRegister = 0;
+	if (isInstancing) {
+		// Particle用 粒ごとのTransformをStructuredBuffer(SRV)としてVertexShaderへ渡す
+		rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; // DescriptorTableを使う
+		rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // VertexShaderで使う
+		rootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing; // Tableの中身の配列を指定
+		rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing); // Tableで利用する数
+	} else {
+		// Object3d用 1つ分のWVPをConstantBufferとしてVertexShaderへ渡す
+		rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+		rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // VertexShaderで使う
+		rootParameters[1].Descriptor.ShaderRegister = 0;
+	}
 
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; // DescriptorTableを使う
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // PixelShaderで使う
@@ -60,7 +77,8 @@ void RootSignature::Initialize(ID3D12Device* device, std::ostream& logStream) {
 	rootParameters[3].Descriptor.ShaderRegister = 1; // レジスタ番号1を使う
 
 	descriptionRootSignature.pParameters = rootParameters; // ルートパラメータ配列へのポインタ
-	descriptionRootSignature.NumParameters = _countof(rootParameters); // 配列の長さ
+	// Particle用は平行光源(b1)を使わないため、3番を除いた3つだけにする
+	descriptionRootSignature.NumParameters = isInstancing ? 3u : static_cast<UINT>(_countof(rootParameters)); // 配列の長さ
 
 	/// --- Serialize ---
 	// シリアライズしてバイナリにする
