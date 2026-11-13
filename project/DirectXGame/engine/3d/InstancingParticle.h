@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <d3d12.h>
+#include <limits>
 #include <random>
 #include <vector>
 #include <wrl.h>
@@ -24,6 +25,10 @@ struct Particle {
 	Vector3 velocity;
 	// 色 (RGBA)
 	Vector4 color;
+	// 生存可能な時間 (s)
+	float lifeTime;
+	// 発生してからの経過時間 (s)
+	float currentTime;
 };
 
 ///// ----- ===== ----- /////
@@ -152,6 +157,14 @@ public:
 		return updateMode_;
 	}
 
+	/// <summary>
+	/// 今のフレームで生きている (描画する) 粒の数を取得する
+	/// </summary>
+	/// <returns></returns>
+	uint32_t GetAliveCount() const {
+		return aliveCount_;
+	}
+
 	///// ----- ===== ----- /////
 
 	///// ----- setter ----- /////
@@ -189,9 +202,12 @@ private:
 	std::vector<VertexData> vertices_;
 	VertexBuffer vertexBuffer_;
 
-	// 最大数と、今描画している数
+	// 最大数と、使う粒の数 (ImGuiで変更する)
 	uint32_t maxInstanceCount_ = 0;
 	uint32_t instanceCount_ = 0;
+
+	// 生きている粒の数 (描画すべきインスタンス数、毎フレーム数え直す)
+	uint32_t aliveCount_ = 0;
 
 	// 粒共通のマテリアル
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;

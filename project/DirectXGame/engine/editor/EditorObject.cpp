@@ -519,6 +519,9 @@ void InstancingParticleEditorObject::DrawProperties() {
 		&maxCount
 	);
 
+	// 生きている (描画している) 粒の数を表示する
+	ImGui::Text("Alive Count : %u", particle_.GetAliveCount());
+
 	/// --- Update ---
 
 	// 動かし方を選ぶ (NormalとRandomは同時にオンにならない、外すと最初の並びに戻る)

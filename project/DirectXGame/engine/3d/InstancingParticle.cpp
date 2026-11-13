@@ -116,16 +116,6 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 	// 描画数が確保したResourceの数を超えないようにする
 	assert(instanceCount_ <= maxInstanceCount_);
 
-	/// --- 移動 ---
-
-	// 動かす設定のときだけ、速度(m/s) × 経過時間(s) で位置を進める
-	if (updateMode_ != ParticleUpdateMode::kNone) {
-		for (uint32_t index = 0; index < instanceCount_; ++index) {
-			particles_[index].transform.translate =
-				particles_[index].transform.translate + particles_[index].velocity * deltaTime;
-		}
-	}
-
 	/// --- 共通の行列 ---
 
 	// 親のTransformからWorld行列を作る (全体をまとめて動かす)
@@ -138,9 +128,26 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 	// View, Projectionは全粒共通なので先にかけておく
 	const Matrix4x4 viewProjectionMatrix = Matrix4x4::Multiply(viewMatrix, projectionMatrix);
 
-	/// --- 粒ごとの行列 ---
+	/// --- 時間の更新と描画数の決定 ---
+
+	// 描画すべきインスタンス数を数え直す
+	aliveCount_ = 0;
 
 	for (uint32_t index = 0; index < instanceCount_; ++index) {
+		// 生存期間を過ぎていたら、更新せず描画対象にしない
+		if (particles_[index].lifeTime <= particles_[index].currentTime) {
+			continue;
+		}
+
+		// 動かす設定のときだけ、位置と経過時間を進める
+		if (updateMode_ != ParticleUpdateMode::kNone) {
+			// 速度(m/s) × 経過時間(s) で位置を進める
+			particles_[index].transform.translate =
+				particles_[index].transform.translate + particles_[index].velocity * deltaTime;
+			// 経過時間を足す
+			particles_[index].currentTime += deltaTime;
+		}
+
 		// 粒自身のTransformから行列を作る
 		const Matrix4x4 localMatrix = Matrix4x4::MakeAffineMatrix(
 			particles_[index].transform.scale,
@@ -151,12 +158,20 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 		// 粒 -> 親 の順にかけてWorld行列を作る
 		const Matrix4x4 worldMatrix = Matrix4x4::Multiply(localMatrix, parentWorldMatrix);
 
-		// World, View, Projection をかけてWVP行列を作り、StructuredBufferへ書き込む
-		instancingData_[index].WVP = Matrix4x4::Multiply(worldMatrix, viewProjectionMatrix);
-		instancingData_[index].World = worldMatrix;
+		// 生きている粒だけを前から詰めて、StructuredBufferへ書き込む
+		instancingData_[aliveCount_].WVP = Matrix4x4::Multiply(worldMatrix, viewProjectionMatrix);
+		instancingData_[aliveCount_].World = worldMatrix;
 
 		// 色はそのままコピーする
-		instancingData_[index].color = particles_[index].color;
+		instancingData_[aliveCount_].color = particles_[index].color;
+
+		// 経過時間に合わせてα値を1.0から0.0へ近づけ、徐々に消えていくようにする
+		const float alpha = 1.0f - (particles_[index].currentTime / particles_[index].lifeTime);
+		// 算出したα値をGPUに送る
+		instancingData_[aliveCount_].color.w = alpha;
+
+		// 生きているParticleの数を1つカウントする
+		++aliveCount_;
 	}
 }
 
@@ -169,13 +184,13 @@ void InstancingParticle::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_
 
 	assert(commandList != nullptr);
 
-	// 描画数が0なら何もしない
-	if (instanceCount_ == 0) {
+	// 生きている粒がなければ何もしない
+	if (aliveCount_ == 0) {
 		return;
 	}
 
 	// 確保したResourceの数を超えないようにする
-	assert(instanceCount_ <= maxInstanceCount_);
+	assert(aliveCount_ <= maxInstanceCount_);
 
 	// 形状の頂点バッファを設定する
 	const D3D12_VERTEX_BUFFER_VIEW& vertexBufferView = vertexBuffer_.GetView();
@@ -189,8 +204,8 @@ void InstancingParticle::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_
 	// テクスチャを設定する
 	commandList->SetGraphicsRootDescriptorTable(2, texterHandle);
 
-	// 板ポリゴンを、描画数だけInstance描画する
-	commandList->DrawInstanced(static_cast<UINT>(vertices_.size()), instanceCount_, 0, 0);
+	// 板ポリゴンを、生きている粒の数だけInstance描画する
+	commandList->DrawInstanced(static_cast<UINT>(vertices_.size()), aliveCount_, 0, 0);
 }
 
 /// <summary>
@@ -238,6 +253,10 @@ void InstancingParticle::ResetParticles() {
 
 		// 色は白にする
 		particles_[index].color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+		// 消えないように、生存可能な時間を最大にしておく
+		particles_[index].lifeTime = (std::numeric_limits<float>::max)(); // Windowsのmaxマクロと衝突しないように()で囲む
+		particles_[index].currentTime = 0.0f;
 	}
 }
 
@@ -275,6 +294,11 @@ Particle InstancingParticle::MakeNewParticle(std::mt19937& randomEngine) {
 		distColor(randomEngine),
 		1.0f
 	};
+
+	// 1秒～3秒の間でランダムに生存させる
+	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
+	particle.lifeTime = distTime(randomEngine);
+	particle.currentTime = 0.0f;
 
 	return particle;
 }
