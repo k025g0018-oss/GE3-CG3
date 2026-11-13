@@ -35,7 +35,8 @@ PixelShaderOutput main(VertexShaderOutput input)
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
     // かんたんのためにLightingは行わない
-    output.color = gMaterial.color * textureColor;
+    // VertexShaderから送られてきたインスタンスごとの色を掛ける
+    output.color = gMaterial.color * textureColor * input.color;
     
     // 最終的なα値が0のときだけPixelを棄却する
     if (output.color.a == 0.0f)

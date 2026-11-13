@@ -8,5 +8,7 @@ struct VertexShaderOutput {
     float32_t2 texcoord : TEXCOORD0;
     // ワールド座標系へ変換した法線をPixel Shaderへ渡す
     float32_t3 normal : NORMAL0;
+    // インスタンスごとの色をPixel Shaderへ渡す
+    float32_t4 color : COLOR0;
 };
 

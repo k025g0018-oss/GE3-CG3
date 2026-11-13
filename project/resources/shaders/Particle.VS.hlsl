@@ -5,12 +5,14 @@
 
 #include "Particle.hlsli"
 
-struct TransformationMatrix {
+// パーティクル1粒分の、GPUが描画に利用するデータ
+struct ParticleForGPU {
     float32_t4x4 WVP;
     float32_t4x4 World;
+    float32_t4 color;
 };
-// インスタンスの数だけ行列が並んだ配列として受け取る
-StructuredBuffer<TransformationMatrix> gTransformationMatrices : register(t0);
+// インスタンスの数だけパーティクルのデータが並んだ配列として受け取る
+StructuredBuffer<ParticleForGPU> gParticle : register(t0);
 
 struct VertexShaderInput {
     float32_t4 position : POSITION0;
@@ -23,10 +25,12 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_Instan
 {
     VertexShaderOutput output;
     // 自分の番号の行列を取り出して変換する
-    output.position = mul(input.position, gTransformationMatrices[instanceId].WVP);
+    output.position = mul(input.position, gParticle[instanceId].WVP);
     output.texcoord = input.texcoord;
      // ローカル法線をワールド座標系へ変換して正規化する
-    output.normal = normalize(mul(input.normal, (float32_t3x3) gTransformationMatrices[instanceId].World));
+    output.normal = normalize(mul(input.normal, (float32_t3x3) gParticle[instanceId].World));
+    // instanceIdはVertexShaderでしか使えないので、色をここで取り出してPixelShaderへ送る
+    output.color = gParticle[instanceId].color;
     
     return output;
 }

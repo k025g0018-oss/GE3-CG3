@@ -61,16 +61,17 @@ void InstancingParticle::Initialize(
 
 	/// --- Instancing用のResource ---
 
-	// 粒の最大数分のTransformationMatrixを格納できるResourceを作る
-	instancingResource_ = BufferResource::Create(device, sizeof(TransformationMatrix) * maxInstanceCount_);
+	// 粒の最大数分のParticleForGPUを格納できるResourceを作る
+	instancingResource_ = BufferResource::Create(device, sizeof(ParticleForGPU) * maxInstanceCount_);
 	// 書き込むためのアドレスを取得
 	hr = instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instancingData_));
 	assert(SUCCEEDED(hr));
 
-	// 単位行列を書き込んでおく
+	// 単位行列と白色を書き込んでおく
 	for (uint32_t index = 0; index < maxInstanceCount_; ++index) {
 		instancingData_[index].WVP = Matrix4x4::MakeIdentity4x4();
 		instancingData_[index].World = Matrix4x4::MakeIdentity4x4();
+		instancingData_[index].color = {1.0f, 1.0f, 1.0f, 1.0f};
 	}
 
 	/// --- Instancing用のSRV ---
@@ -83,7 +84,7 @@ void InstancingParticle::Initialize(
 	instancingSrvDesc.Buffer.FirstElement = 0;
 	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 	instancingSrvDesc.Buffer.NumElements = maxInstanceCount_; // アクセスする要素数
-	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix); // 1要素のサイズ
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleForGPU); // 1要素のサイズ (Strideが変わったのでParticleForGPUにする)
 
 	// ヒープの指定された番号にInstancing用のSRVを作成する
 	const D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = srvDescriptorHeap.GetCPUHandle(srvIndex);
@@ -153,6 +154,9 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 		// World, View, Projection をかけてWVP行列を作り、StructuredBufferへ書き込む
 		instancingData_[index].WVP = Matrix4x4::Multiply(worldMatrix, viewProjectionMatrix);
 		instancingData_[index].World = worldMatrix;
+
+		// 色はそのままコピーする
+		instancingData_[index].color = particles_[index].color;
 	}
 }
 
@@ -231,6 +235,9 @@ void InstancingParticle::ResetParticles() {
 
 		// 速度を上向きに設定 (1m/s)
 		particles_[index].velocity = {0.0f, 1.0f, 0.0f};
+
+		// 色は白にする
+		particles_[index].color = {1.0f, 1.0f, 1.0f, 1.0f};
 	}
 }
 
@@ -258,6 +265,15 @@ Particle InstancingParticle::MakeNewParticle(std::mt19937& randomEngine) {
 		distribution(randomEngine),
 		distribution(randomEngine),
 		distribution(randomEngine)
+	};
+
+	// 0.0～1.0の範囲でRGBをランダムに決める (αは1.0)
+	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
+	particle.color = {
+		distColor(randomEngine),
+		distColor(randomEngine),
+		distColor(randomEngine),
+		1.0f
 	};
 
 	return particle;

@@ -22,6 +22,22 @@ struct Particle {
 	Transform transform;
 	// 速度 (m/s)
 	Vector3 velocity;
+	// 色 (RGBA)
+	Vector4 color;
+};
+
+///// ----- ===== ----- /////
+
+///// ----- GPUに転送するパーティクルのデータ ----- /////
+
+/// <summary>
+/// GPUが描画に利用するデータ (シェーダーのParticleForGPUと同じ並びにする)
+/// Particle(CPUで動かす挙動のデータ)とは別物
+/// </summary>
+struct ParticleForGPU {
+	Matrix4x4 WVP;
+	Matrix4x4 World;
+	Vector4 color;
 };
 
 ///// ----- ===== ----- /////
@@ -190,9 +206,9 @@ private:
 	// 乱数生成器
 	std::mt19937 randomEngine_;
 
-	// 粒ごとのwvp・Worldを並べたStructuredBuffer
+	// 粒ごとのwvp・World・色を並べたStructuredBuffer
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_;
-	TransformationMatrix* instancingData_ = nullptr;
+	ParticleForGPU* instancingData_ = nullptr;
 
 	// StructuredBufferをシェーダーから読むためのSRV
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU_{};
