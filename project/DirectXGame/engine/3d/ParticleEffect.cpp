@@ -3,6 +3,7 @@
 #include "PrimitiveMesh.h"
 #include "TextureManager.h"
 
+#include <cassert>
 #include <numbers>
 
 /// <summary>
@@ -68,6 +69,34 @@ void ParticleEffect::Initialize(
 	star.lifeTimeMax = 3.0f;
 	star.fadeInRatio = 0.2f;
 	AddGroup(star);
+
+	/// --- 三角錐・立方体 ---
+
+	// どちらも同じ大きさで、ランダムな位置にずっと残り、ランダムな向きに回転し続ける
+	// 色は粒ごとにランダム、陰影をつけて立体に見せる
+	ParticleGroupSettings pyramid;
+	pyramid.name = "Pyramid";
+	pyramid.vertices = PrimitiveMesh::CreatePyramid();
+	pyramid.maxCount = 10;
+	pyramid.textureIndex = textureManager.FindTextureIndex("white.png");
+	pyramid.spawnMin = screenMin;
+	pyramid.spawnMax = screenMax;
+	pyramid.scaleMin = 0.2f;
+	pyramid.scaleMax = 0.2f;
+	pyramid.angularSpeedMin = 0.5f * std::numbers::pi_v<float>;
+	pyramid.angularSpeedMax = 1.0f * std::numbers::pi_v<float>;
+	pyramid.isRotateAllAxes = true;
+	pyramid.isImmortal = true;
+	pyramid.isRandomColor = true;
+	pyramid.isLightingEnabled = true;
+	pyramid.isSolid = true;
+	AddGroup(pyramid);
+
+	// 立方体は形状と名前だけ変える
+	ParticleGroupSettings cube = pyramid;
+	cube.name = "Cube";
+	cube.vertices = PrimitiveMesh::CreateCube();
+	AddGroup(cube);
 }
 
 /// <summary>
@@ -89,13 +118,36 @@ void ParticleEffect::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projec
 /// <param name="commandList"></param>
 /// <param name="textureManager"></param>
 /// <param name="particlePipelineState"></param>
+/// <param name="solidParticlePipelineState"></param>
 void ParticleEffect::Draw(
 	ID3D12GraphicsCommandList* commandList,
 	const TextureManager& textureManager,
-	const PipelineState& particlePipelineState) const {
+	const PipelineState& particlePipelineState,
+	const PipelineState& solidParticlePipelineState) const {
+
+	/// --- 不透明な立体 ---
+
+	// 先にDepthを書き込んでおき、後から描く光る粒が立体の奥にあるときは隠れるようにする
+	for (const std::unique_ptr<ParticleGroup>& group : groups_) {
+		if (!group->IsSolid()) {
+			continue;
+		}
+
+		// グループのBlendModeのPSO (Depthを書き込む) に切り替える
+		commandList->SetPipelineState(solidParticlePipelineState.GetPipelineState(group->GetBlendMode()));
+
+		// グループのテクスチャを貼って描画する
+		group->Draw(commandList, textureManager.GetSrvHandle(group->GetTextureIndex()));
+	}
+
+	/// --- 光る粒 ---
 
 	for (const std::unique_ptr<ParticleGroup>& group : groups_) {
-		// グループのBlendModeのPSOに切り替える
+		if (group->IsSolid()) {
+			continue;
+		}
+
+		// グループのBlendModeのPSO (Depthを書き込まない) に切り替える
 		commandList->SetPipelineState(particlePipelineState.GetPipelineState(group->GetBlendMode()));
 
 		// グループのテクスチャを貼って描画する
@@ -119,6 +171,9 @@ void ParticleEffect::Finalize() {
 /// </summary>
 /// <param name="settings"></param>
 void ParticleEffect::AddGroup(const ParticleGroupSettings& settings) {
+
+	// 予約したSRVの数を超えないようにする
+	assert(groups_.size() < kMaxGroupCount);
 
 	std::unique_ptr<ParticleGroup> group = std::make_unique<ParticleGroup>();
 

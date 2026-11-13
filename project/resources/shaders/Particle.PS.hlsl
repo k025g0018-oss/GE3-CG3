@@ -20,7 +20,8 @@ Texture2D<float32_t4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 ConstantBuffer<Material> gMaterial : register(b0);
 
-// Particleではライティングを行わないため、平行光源(gDirectionalLight)は宣言しない
+// Particleでは平行光源(gDirectionalLight)を受け取らないため、立体の形状用に固定の光の向きを使う
+static const float32_t3 kParticleLightDirection = normalize(float32_t3(-0.5f, -1.0f, 0.5f));
 
 struct PixelShaderOutput {
     float32_t4 color : SV_TARGET0;
@@ -41,9 +42,16 @@ PixelShaderOutput main(VertexShaderOutput input)
         discard;
     }
     
-    // かんたんのためにLightingは行わない
     // VertexShaderから送られてきたインスタンスごとの色を掛ける
     output.color = gMaterial.color * textureColor * input.color;
+    
+    // 三角錐や立方体など立体の形状だけ、Half Lambertで簡易的な陰影をつける (板のパーティクルは行わない)
+    if (gMaterial.enableLighting != 0)
+    {
+        float NdotL = dot(normalize(input.normal), -kParticleLightDirection);
+        float lightIntensity = pow(NdotL * 0.5f + 0.5f, 2.0f);
+        output.color.rgb *= lightIntensity;
+    }
     
     // 最終的なα値が0のときだけPixelを棄却する
     if (output.color.a == 0.0f)

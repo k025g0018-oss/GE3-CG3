@@ -39,9 +39,11 @@ struct ParticleGroupSettings {
 	float speedMin = 0.0f;
 	float speedMax = 0.0f;
 
-	// Z軸回転の速さ (rad/s) 0なら回転しない、向きはランダム
+	// 回転の速さ (rad/s) 0なら回転しない、向きはランダム
 	float angularSpeedMin = 0.0f;
 	float angularSpeedMax = 0.0f;
+	// trueならランダムな軸で回転する (立体用)、falseならZ軸だけで回転する (板用)
+	bool isRotateAllAxes = false;
 
 	// 拡縮の幅 (倍率) 0なら大きさは変化しない
 	float scalePulseAmount = 0.0f;
@@ -55,6 +57,18 @@ struct ParticleGroupSettings {
 
 	// 寿命のうち、フェードインに使う割合 (0.0ならフェードインしない)
 	float fadeInRatio = 0.0f;
+
+	// trueなら寿命がなく、消えずにずっと残る
+	bool isImmortal = false;
+
+	// trueなら粒ごとに色をランダムにする (falseならテクスチャの色そのまま)
+	bool isRandomColor = false;
+
+	// trueなら簡易ライティングで陰影をつける (立体用)
+	bool isLightingEnabled = false;
+
+	// trueならDepthを書き込むPSOで描画する (不透明な立体用)
+	bool isSolid = false;
 };
 
 ///// ----- ===== ----- /////
@@ -111,6 +125,11 @@ public:
 	/// </summary>
 	void Finalize();
 
+	/// <summary>
+	/// 全ての粒を発生させ直す (位置・向き・色などを再抽選する)
+	/// </summary>
+	void Randomize();
+
 	///// ----- ===== ----- /////
 
 	///// ----- getter ----- /////
@@ -129,6 +148,14 @@ public:
 	/// <returns></returns>
 	uint32_t GetTextureIndex() const {
 		return settings_.textureIndex;
+	}
+
+	/// <summary>
+	/// Depthを書き込むPSOで描画するかどうかを取得する
+	/// </summary>
+	/// <returns></returns>
+	bool IsSolid() const {
+		return settings_.isSolid;
 	}
 
 	/// <summary>

@@ -18,7 +18,13 @@ namespace PrimitiveMesh {
 
 	/// --- 三角錐 ---
 
+	// 底面が正三角形の三角錐 (4面、12頂点) 高さ2、-1～1に収まる
+	std::vector<VertexData> CreatePyramid();
+
 	/// --- 立方体 ---
+
+	// 2x2x2の立方体 (6面、36頂点)
+	std::vector<VertexData> CreateCube();
 
 };
 

@@ -36,13 +36,15 @@ public:
 	/// <param name="vertexShaderPath">省略時はObject3dのVertexShader</param>
 	/// <param name="pixelShaderPath">省略時はObject3dのPixelShader</param>
 	/// <param name="isInstancing">trueならParticle用のRootSignatureを使う</param>
+	/// <param name="isDepthWriteEnabled">falseならDepthを書き込まない (半透明のParticle用)</param>
 	void Initialize(
 		ID3D12Device* device,
 		DxcCompiler* dxcCompiler,
 		std::ostream& logStream,
 		const std::wstring& vertexShaderPath = L"resources/shaders/Object3d.VS.hlsl",
 		const std::wstring& pixelShaderPath = L"resources/shaders/Object3d.PS.hlsl",
-		bool isInstancing = false);
+		bool isInstancing = false,
+		bool isDepthWriteEnabled = true);
 
 	/// --- 取得 ---
 	// 作成したRootSignatureを取得

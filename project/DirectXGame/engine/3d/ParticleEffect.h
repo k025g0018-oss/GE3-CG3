@@ -21,6 +21,9 @@ class ParticleEffect {
 public:
 	///// ----- メンバ関数 ----- /////
 
+	// 作れるグループの最大数 (Instancing用SRVをこの数だけ予約する)
+	static constexpr uint32_t kMaxGroupCount = 8;
+
 	ParticleEffect() = default;
 	~ParticleEffect() = default;
 
@@ -56,11 +59,13 @@ public:
 	/// </summary>
 	/// <param name="commandList"></param>
 	/// <param name="textureManager"></param>
-	/// <param name="particlePipelineState">Particle用のPSO</param>
+	/// <param name="particlePipelineState">Particle用のPSO (Depthを書き込まない)</param>
+	/// <param name="solidParticlePipelineState">不透明な立体用のPSO (Depthを書き込む)</param>
 	void Draw(
 		ID3D12GraphicsCommandList* commandList,
 		const TextureManager& textureManager,
-		const PipelineState& particlePipelineState) const;
+		const PipelineState& particlePipelineState,
+		const PipelineState& solidParticlePipelineState) const;
 
 	/// <summary>
 	/// 終了処理

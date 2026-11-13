@@ -615,6 +615,13 @@ void ParticleEffectEditorObject::DrawProperties() {
 	// 描画をON/OFFする
 	ImGui::Checkbox("Draw Effect", &isVisible_);
 
+	// 全てのグループの位置・向き・色を再抽選する
+	if (ImGui::Button("Randomize All")) {
+		for (std::unique_ptr<ParticleGroup>& group : effect_.GetGroups()) {
+			group->Randomize();
+		}
+	}
+
 	const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
 
 	/// --- グループごと ---
@@ -626,6 +633,11 @@ void ParticleEffectEditorObject::DrawProperties() {
 		}
 
 		InstancingParticle& particle = group->GetInstancingParticle();
+
+		// このグループの位置・向き・色を再抽選する
+		if (ImGui::Button("Randomize")) {
+			group->Randomize();
+		}
 
 		// 1～最大数の範囲で使う粒の数を変更する
 		const uint32_t minCount = 1;

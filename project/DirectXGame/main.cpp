@@ -856,6 +856,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// Particle用のShaderとRootSignatureで、全てのBlendMode分のPSOを作成する
 		// RootSignatureはObject3d用とParticle用で別々に作って管理する
+		// 半透明の粒同士で隠し合わないように、Depthは書き込まない
 		PipelineState particlePipelineState;
 		particlePipelineState.Initialize(
 			device,
@@ -863,6 +864,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			logStream,
 			L"resources/shaders/Particle.VS.hlsl",
 			L"resources/shaders/Particle.PS.hlsl",
+			true,
+			false);
+
+		/// --- 不透明な立体のParticle用PSO ---
+
+		// 三角錐・立方体のような不透明な立体は、前後関係が正しくなるようにDepthを書き込む
+		PipelineState solidParticlePipelineState;
+		solidParticlePipelineState.Initialize(
+			device,
+			graphicsDevice->GetDxcCompiler(),
+			logStream,
+			L"resources/shaders/Particle.VS.hlsl",
+			L"resources/shaders/Particle.PS.hlsl",
+			true,
 			true);
 
 		/// --- BlendMode ---
@@ -1319,7 +1334,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// Instancing用SRVは、Instancing Particleの次の番号からグループの数だけ使う
 		constexpr uint32_t kParticleEffectSrvStartIndex = kInstancingParticleSrvIndex + 1;
 
-		// ぽわぽわと星を画面全体にちりばめるパーティクルエフェクト
+		// ぽわぽわ・星・三角錐・立方体を画面全体にちりばめるパーティクルエフェクト
 		ParticleEffect particleEffect;
 		particleEffect.Initialize(
 			device,
@@ -1329,6 +1344,40 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// 表示の切り替え
 		bool isParticleEffectVisible = true;
+
+		///// ----- ===== ----- /////
+
+		///// ----- 背景 ----- /////
+
+		/// --- 初期化 ---
+		// Instancing用SRVは、Particle Effectが予約した番号の次を使う
+		constexpr uint32_t kBackgroundSrvIndex = kParticleEffectSrvStartIndex + ParticleEffect::kMaxGroupCount;
+
+		// ノイズ画像を貼った大きな板を1枚だけ、一番奥に描画する
+		InstancingParticle background;
+		background.Initialize(
+			device,
+			srvDescriptorHeap,
+			kBackgroundSrvIndex,
+			PrimitiveMesh::CreateQuad(),
+			1);
+
+		// カメラ(Z=-10)から30m奥に置き、画面全体を覆う大きさにする (板は2m×2m)
+		background.GetTransform().translate = {0.0f, 0.0f, 20.0f};
+		background.GetTransform().scale = {12.5f, 7.0f, 1.0f};
+
+		// 紫っぽい色をかけて宇宙のような色合いにする
+		background.GetColor() = {0.4f, 0.25f, 0.7f, 1.0f};
+
+		// 不透明で描画し、ノイズのα値で抜けないように閾値を0未満にする
+		background.GetBlendMode() = BlendMode::kNone;
+		background.GetDissolveThreshold() = -1.0f;
+
+		// 表示の切り替え
+		bool isBackgroundVisible = true;
+
+		// 貼るテクスチャの番号 (最初noise)
+		int backgroundTextureMode = 6;
 
 		///// ----- ===== ----- /////
 
@@ -1444,6 +1493,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			"Particle Effect",
 			isParticleEffectVisible);
 
+		// 背景をHierarchyとPropertiesへ接続する
+		InstancingParticleEditorObject backgroundEditor(
+			background,
+			"Background",
+			backgroundTextureMode,
+			isBackgroundVisible);
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1465,6 +1521,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&fenceModelEditor,
 			&instancingParticleEditor,
 			&particleEffectEditor,
+			&backgroundEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1906,8 +1963,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 速度で粒を動かし、Instancing ParticleのWVPを更新する
 			instancingParticle.Update(viewMatrix, projectionMatrix, deltaTime);
 
-			// ぽわぽわと星を発生・移動・消滅させ、WVPを更新する
+			// ぽわぽわ・星・三角錐・立方体を発生・移動・回転させ、WVPを更新する
 			particleEffect.Update(viewMatrix, projectionMatrix, deltaTime);
+
+			// 背景は動かさないので、WVPだけ更新する
+			background.TransferToGPU(viewMatrix, projectionMatrix);
 
 			/// --- Object3D用WVPを計算する ---
 
@@ -1956,6 +2016,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// DirectX描画開始
 			graphicsDevice->PreDraw();
+
+			/// --- 背景描画 ---
+
+			// 一番最初に描画し、Depthを書き込まないので全ての物の後ろに見える
+			if (isBackgroundVisible) {
+				// Particle用のRootSignatureとPSO (Depthを書き込まない) を使う
+				commandList->SetGraphicsRootSignature(particlePipelineState.GetRootSignature());
+				commandList->SetPipelineState(particlePipelineState.GetPipelineState(background.GetBlendMode()));
+
+				// Propertiesで選択したテクスチャを貼って描画する
+				background.Draw(
+					commandList,
+					textureManager.GetSrvHandle(static_cast<uint32_t>(backgroundTextureMode)));
+			}
 
 			// RootSignatureの設定
 			commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
@@ -2145,7 +2219,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 				if (isParticleEffectVisible) {
 					// グループごとにBlendModeとテクスチャを切り替えて描画する
-					particleEffect.Draw(commandList, textureManager, particlePipelineState);
+					// 三角錐・立方体はDepthを書き込むPSOで描画する
+					particleEffect.Draw(commandList, textureManager, particlePipelineState, solidParticlePipelineState);
 				}
 
 				// 後に描くSpriteのために、Object3d用のRootSignatureとPSOへ戻す
@@ -2207,6 +2282,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		pipelineState.Finalize();
 		particlePipelineState.Finalize();
+		solidParticlePipelineState.Finalize();
 
 		/// --- 5_スワップチェーンとバックバッファリソース ---
 

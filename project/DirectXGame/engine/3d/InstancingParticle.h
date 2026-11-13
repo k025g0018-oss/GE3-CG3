@@ -242,6 +242,14 @@ public:
 		fadeInRatio_ = fadeInRatio;
 	}
 
+	/// <summary>
+	/// 簡易ライティングで陰影をつけるかどうかを設定する (立体の形状用)
+	/// </summary>
+	/// <param name="isLightingEnabled"></param>
+	void SetLightingEnabled(bool isLightingEnabled) {
+		materialData_->enableLighting = isLightingEnabled;
+	}
+
 	///// ----- ===== ----- /////
 
 private:

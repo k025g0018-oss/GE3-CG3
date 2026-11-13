@@ -18,13 +18,15 @@ PipelineState::~PipelineState() {
 /// <param name="vertexShaderPath"></param>
 /// <param name="pixelShaderPath"></param>
 /// <param name="isInstancing"></param>
+/// <param name="isDepthWriteEnabled"></param>
 void PipelineState::Initialize(
 	ID3D12Device* device,
 	DxcCompiler* dxcCompiler,
 	std::ostream& logStream,
 	const std::wstring& vertexShaderPath,
 	const std::wstring& pixelShaderPath,
-	bool isInstancing) {
+	bool isInstancing,
+	bool isDepthWriteEnabled) {
 
 	/// --- RootSignature ---
 
@@ -48,8 +50,8 @@ void PipelineState::Initialize(
 
 	/// --- DepthStencilState ---
 
-	// 奥行きの比較と書き込み方法を設定 (Particle用は半透明で重なるため、Depthを書き込まない)
-	depthStencilState_.Initialize(!isInstancing);
+	// 奥行きの比較と書き込み方法を設定 (半透明で重なるParticle用は、Depthを書き込まない)
+	depthStencilState_.Initialize(isDepthWriteEnabled);
 
 	/// --- GraphicsPipelineState ---
 

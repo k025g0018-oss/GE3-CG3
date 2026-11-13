@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 /// <summary>
@@ -40,9 +41,26 @@ void ParticleGroup::Initialize(
 	// ふわっと現れるようにする
 	instancingParticle_.SetFadeInRatio(settings_.fadeInRatio);
 
+	// 立体の形状は陰影をつける
+	instancingParticle_.SetLightingEnabled(settings_.isLightingEnabled);
+
+	// 不透明な立体は、テクスチャのα値で抜けないようにする
+	if (settings_.isSolid) {
+		instancingParticle_.GetBlendMode() = BlendMode::kNone;
+		blendMode_ = BlendMode::kNone;
+	}
+
 	/// --- 最初の粒 ---
 
 	// 経過時間もランダムにして、最初から画面にちりばめた状態にする
+	Randomize();
+}
+
+/// <summary>
+/// 全ての粒を発生させ直す
+/// </summary>
+void ParticleGroup::Randomize() {
+
 	std::vector<Particle>& particles = instancingParticle_.GetParticles();
 	for (uint32_t index = 0; index < settings_.maxCount; ++index) {
 		particles[index] = MakeNewParticle(true);
@@ -155,27 +173,68 @@ Particle ParticleGroup::MakeNewParticle(bool isFirstSpawn) {
 
 	/// --- 回転 ---
 
-	// 回転するときは、最初の向きもランダムにする
+	const float kTwoPi = 2.0f * std::numbers::pi_v<float>;
 	const float angularSpeed = RandomRange(settings_.angularSpeedMin, settings_.angularSpeedMax);
-	if (angularSpeed != 0.0f) {
-		particle.transform.rotate.z = RandomRange(0.0f, 2.0f * std::numbers::pi_v<float>);
-	}
 
-	// 右回りか左回りかをランダムに決める (rad/s)
-	const float rotateDirection = (RandomRange(0.0f, 1.0f) < 0.5f) ? -1.0f : 1.0f;
-	particle.angularVelocity = {0.0f, 0.0f, angularSpeed * rotateDirection};
+	if (settings_.isRotateAllAxes) {
+		// 最初の向きを全ての軸でランダムにする
+		particle.transform.rotate = {
+			RandomRange(0.0f, kTwoPi),
+			RandomRange(0.0f, kTwoPi),
+			RandomRange(0.0f, kTwoPi)
+		};
+
+		// ランダムな向きのベクトルを作り、XYZそれぞれの回転の速さに割り振る (rad/s)
+		Vector3 axis = {
+			RandomRange(-1.0f, 1.0f),
+			RandomRange(-1.0f, 1.0f),
+			RandomRange(-1.0f, 1.0f)
+		};
+		const float axisLength = std::sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+		if (axisLength > 0.0001f) {
+			axis = axis * (1.0f / axisLength);
+		} else {
+			axis = {0.0f, 1.0f, 0.0f};
+		}
+		particle.angularVelocity = axis * angularSpeed;
+	} else {
+		// 回転するときは、最初の向きもランダムにする
+		if (angularSpeed != 0.0f) {
+			particle.transform.rotate.z = RandomRange(0.0f, kTwoPi);
+		}
+
+		// 右回りか左回りかをランダムに決める (rad/s)
+		const float rotateDirection = (RandomRange(0.0f, 1.0f) < 0.5f) ? -1.0f : 1.0f;
+		particle.angularVelocity = {0.0f, 0.0f, angularSpeed * rotateDirection};
+	}
 
 	/// --- 色 ---
 
-	// テクスチャの色をそのまま使う
-	particle.color = {1.0f, 1.0f, 1.0f, 1.0f};
+	if (settings_.isRandomColor) {
+		// 暗くなりすぎないように、0.3～1.0の範囲でRGBをランダムに決める
+		particle.color = {
+			RandomRange(0.3f, 1.0f),
+			RandomRange(0.3f, 1.0f),
+			RandomRange(0.3f, 1.0f),
+			1.0f
+		};
+	} else {
+		// テクスチャの色をそのまま使う
+		particle.color = {1.0f, 1.0f, 1.0f, 1.0f};
+	}
 
 	/// --- 寿命 ---
 
-	particle.lifeTime = RandomRange(settings_.lifeTimeMin, settings_.lifeTimeMax);
+	if (settings_.isImmortal) {
+		// 寿命をなくし、消えずにずっと残るようにする (Windowsのmaxマクロと衝突しないように()で囲む)
+		particle.lifeTime = (std::numeric_limits<float>::max)();
+		particle.currentTime = 0.0f;
+	} else {
+		particle.lifeTime = RandomRange(settings_.lifeTimeMin, settings_.lifeTimeMax);
 
-	// 最初の発生だけ経過時間もランダムにして、消えるタイミングをばらばらにする
-	particle.currentTime = isFirstSpawn ? RandomRange(0.0f, particle.lifeTime) : 0.0f;
+		// 最初の発生だけ経過時間もランダムにして、消えるタイミングをばらばらにする
+		particle.currentTime = isFirstSpawn ? RandomRange(0.0f, particle.lifeTime) : 0.0f;
+	}
 
 	return particle;
 }
