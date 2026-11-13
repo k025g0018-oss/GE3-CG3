@@ -29,6 +29,7 @@
 #include "InstancingParticle.h"
 #include "ParticleEffect.h"
 #include "MouseParticleEffect.h"
+#include "CameraShake.h"
 #include "PrimitiveMesh.h"
 
 #include <cstdint> // int32_t
@@ -1418,6 +1419,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- ===== ----- /////
 
+		///// ----- 画面シェイク ----- /////
+
+		// クリックしたときに、View行列をずらして画面を揺らす
+		CameraShake cameraShake;
+		cameraShake.Initialize();
+
+		///// ----- ===== ----- /////
+
 		///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 		// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1543,6 +1552,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			"Mouse Particle Effect",
 			isMouseParticleEffectVisible);
 
+		// 画面シェイクをHierarchyとPropertiesへ接続する
+		CameraShakeEditorObject cameraShakeEditor(
+			cameraShake,
+			"Camera Shake");
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1566,6 +1580,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&particleEffectEditor,
 			&backgroundEditor,
 			&mouseParticleEffectEditor,
+			&cameraShakeEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1969,6 +1984,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			debugCamera.Update();
 
+			/// --- 画面シェイク ---
+
+			// ゲーム画面をクリックした瞬間に揺らし始める
+			if (isMouseClicked) {
+				cameraShake.Start();
+			}
+
+			// 揺れている間は、毎フレームずらす量をランダムに決め直す
+			cameraShake.Update(deltaTime);
+
 			/// --- ParticleSystemの更新 ---
 
 			// ImGuiで切り替えても、現在のフレームは同じモードで更新と描画を行う
@@ -1992,10 +2017,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- ビュー行列の更新 ---
 
 			// 選択中のカメラからView行列を取得する
-			const Matrix4x4& viewMatrix =
+			const Matrix4x4& cameraViewMatrix =
 				isDebugCameraActive
 				? debugCamera.GetViewMatrix()
 				: camera.GetViewMatrix();
+
+			// 画面シェイクの揺れを加える (揺れていないときはそのまま)
+			// 全ての3D描画がこのView行列を使うので、画面全体が揺れる
+			const Matrix4x4 viewMatrix = cameraShake.ApplyToView(cameraViewMatrix);
 
 			/// --- プロジェクション行列の更新 ---
 

@@ -10,6 +10,7 @@
 #include "InstancingParticle.h"
 #include "ParticleEffect.h"
 #include "MouseParticleEffect.h"
+#include "CameraShake.h"
 
 // ゲームオブジェクトをImGuiのHierarchyとPropertiesへ接続する共通ラッパー
 class IEditorObject {
@@ -233,6 +234,28 @@ private:
 
 	// 描画するかどうかをmainと共有する
 	bool& isVisible_;
+};
+
+// CameraShakeをHierarchyとPropertiesへ接続するラッパークラス
+class CameraShakeEditorObject final : public IEditorObject {
+public:
+	CameraShakeEditorObject(
+		CameraShake& cameraShake,
+		const char* name
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 本体は所有せず、mainで作成したCameraShakeを参照する
+	CameraShake& cameraShake_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
 };
 
 #endif // USE_IMGUI

@@ -746,4 +746,34 @@ void MouseParticleEffectEditorObject::DrawProperties() {
 	}
 }
 
+///// ----- ===== ----- /////
+
+///// ----- CameraShake ----- /////
+
+CameraShakeEditorObject::CameraShakeEditorObject(
+	CameraShake& cameraShake,
+	const char* name)
+	: cameraShake_(cameraShake),
+	name_(name) {
+}
+
+void CameraShakeEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Camera Shake Control");
+
+	// クリックで揺らすかどうか
+	ImGui::Checkbox("Enable", &cameraShake_.GetIsEnabled());
+
+	// 揺れる時間 (秒) と強さ (m)
+	ImGui::SliderFloat("Duration", &cameraShake_.GetDuration(), 0.01f, 1.0f, "%.2f s");
+	ImGui::SliderFloat("Amplitude", &cameraShake_.GetAmplitude(), 0.0f, 0.5f, "%.3f m");
+
+	// クリックしなくても試せるようにする
+	if (ImGui::Button("Test Shake")) {
+		cameraShake_.Start();
+	}
+
+	ImGui::SameLine();
+	ImGui::TextUnformatted(cameraShake_.IsShaking() ? "Shaking" : "Idle");
+}
+
 #endif // USE_IMGUI
