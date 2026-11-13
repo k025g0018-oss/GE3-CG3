@@ -1286,7 +1286,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 板パーティクルの最大数
 		constexpr uint32_t kPlaneParticleMaxCount = 10;
 
-		// Instancing用SRVの番号 (0:ImGui、1～6:Texture、7:Scene画面 の次の空いている番号)
+		// Instancing用SRVの番号 (0:ImGui、1～kTextureCount:Texture、その次:Scene画面 の次の空いている番号)
 		constexpr uint32_t kInstancingParticleSrvIndex = 1 + TextureManager::kTextureCount + 1;
 
 		// 板をDrawInstancedでまとめて描画する

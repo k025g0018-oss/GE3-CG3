@@ -34,6 +34,13 @@ PixelShaderOutput main(VertexShaderOutput input)
     // テクスチャから色を取得する
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
+    // Dissolve (αTest) テクスチャのα値が閾値以下のPixelを棄却する
+    // 閾値を上げると抜ける部分が増え、下げると減る
+    if (textureColor.a <= input.dissolveThreshold)
+    {
+        discard;
+    }
+    
     // かんたんのためにLightingは行わない
     // VertexShaderから送られてきたインスタンスごとの色を掛ける
     output.color = gMaterial.color * textureColor * input.color;

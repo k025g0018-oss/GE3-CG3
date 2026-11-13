@@ -44,6 +44,8 @@ struct ParticleForGPU {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
 	Vector4 color;
+	// Dissolve (αTest) の閾値 テクスチャのα値がこれ以下のPixelは描画しない
+	float dissolveThreshold;
 };
 
 ///// ----- ===== ----- /////
@@ -174,6 +176,30 @@ public:
 		return blendMode_;
 	}
 
+	/// <summary>
+	/// Propertiesから再発生するかどうかを操作する
+	/// </summary>
+	/// <returns></returns>
+	bool& GetIsRespawn() {
+		return isRespawn_;
+	}
+
+	/// <summary>
+	/// PropertiesからDissolveの閾値を操作する (0.0～1.0)
+	/// </summary>
+	/// <returns></returns>
+	float& GetDissolveThreshold() {
+		return dissolveThreshold_;
+	}
+
+	/// <summary>
+	/// Propertiesから寿命に合わせてDissolveさせるかどうかを操作する
+	/// </summary>
+	/// <returns></returns>
+	bool& GetIsDissolveOverLife() {
+		return isDissolveOverLife_;
+	}
+
 	///// ----- ===== ----- /////
 
 	///// ----- setter ----- /////
@@ -230,6 +256,15 @@ private:
 
 	// 描画に使うBlendMode (パーティクルは加算で調整することがほとんど)
 	BlendMode blendMode_ = BlendMode::kAdd;
+
+	// Randomのとき、寿命が尽きた粒を再発生させるかどうか
+	bool isRespawn_ = false;
+
+	// Dissolve (αTest) の閾値 上げるほど抜ける部分が増える
+	float dissolveThreshold_ = 0.0f;
+
+	// Randomのとき、寿命に合わせて閾値を上げていくかどうか
+	bool isDissolveOverLife_ = false;
 
 	// 乱数生成器
 	std::mt19937 randomEngine_;

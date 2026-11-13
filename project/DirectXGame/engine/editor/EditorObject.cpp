@@ -12,7 +12,8 @@ const char* kTextureModes[] = {
 	"2 : Genbaneko",
 	"3 : Monster Ball",
 	"4 : Checker Board",
-	"5 : Fence"
+	"5 : Fence",
+	"6 : Noise"
 };
 }
 
@@ -540,6 +541,22 @@ void InstancingParticleEditorObject::DrawProperties() {
 	if (ImGui::Checkbox("Random", &isRandom)) {
 		particle_.SetUpdateMode(isRandom ? ParticleUpdateMode::kRandom : ParticleUpdateMode::kNone);
 	}
+
+	// 寿命が尽きた粒を再発生させる (Randomのときだけ操作できる)
+	ImGui::BeginDisabled(!isRandom);
+	ImGui::Checkbox("Respawn", &particle_.GetIsRespawn());
+	ImGui::EndDisabled();
+
+	/// --- Dissolve ---
+
+	// αTestの閾値を変えて、テクスチャのα値が低い部分から抜けるようにする (Noiseテクスチャで分かりやすい)
+	ImGui::SeparatorText("Dissolve");
+	ImGui::SliderFloat("Dissolve Threshold", &particle_.GetDissolveThreshold(), 0.0f, 1.0f);
+
+	// 寿命に合わせて閾値を上げていく (Randomのときだけ操作できる)
+	ImGui::BeginDisabled(!isRandom);
+	ImGui::Checkbox("Dissolve Over Life", &particle_.GetIsDissolveOverLife());
+	ImGui::EndDisabled();
 
 	/// --- 見た目 ---
 

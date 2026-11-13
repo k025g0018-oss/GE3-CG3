@@ -10,5 +10,7 @@ struct VertexShaderOutput {
     float32_t3 normal : NORMAL0;
     // インスタンスごとの色をPixel Shaderへ渡す
     float32_t4 color : COLOR0;
+    // インスタンスごとのDissolveの閾値をPixel Shaderへ渡す
+    float dissolveThreshold : TEXCOORD1;
 };
 

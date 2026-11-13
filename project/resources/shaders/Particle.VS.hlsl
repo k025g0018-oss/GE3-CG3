@@ -10,6 +10,8 @@ struct ParticleForGPU {
     float32_t4x4 WVP;
     float32_t4x4 World;
     float32_t4 color;
+    // Dissolve (αTest) の閾値
+    float dissolveThreshold;
 };
 // インスタンスの数だけパーティクルのデータが並んだ配列として受け取る
 StructuredBuffer<ParticleForGPU> gParticle : register(t0);
@@ -31,6 +33,8 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_Instan
     output.normal = normalize(mul(input.normal, (float32_t3x3) gParticle[instanceId].World));
     // instanceIdはVertexShaderでしか使えないので、色をここで取り出してPixelShaderへ送る
     output.color = gParticle[instanceId].color;
+    // Dissolveの閾値もPixelShaderへ送る
+    output.dissolveThreshold = gParticle[instanceId].dissolveThreshold;
     
     return output;
 }

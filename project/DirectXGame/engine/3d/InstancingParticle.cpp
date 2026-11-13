@@ -1,6 +1,7 @@
 #include "InstancingParticle.h"
 #include "BufferResource.h"
 
+#include <algorithm>
 #include <cassert>
 #include <numbers>
 
@@ -72,6 +73,7 @@ void InstancingParticle::Initialize(
 		instancingData_[index].WVP = Matrix4x4::MakeIdentity4x4();
 		instancingData_[index].World = Matrix4x4::MakeIdentity4x4();
 		instancingData_[index].color = {1.0f, 1.0f, 1.0f, 1.0f};
+		instancingData_[index].dissolveThreshold = 0.0f;
 	}
 
 	/// --- Instancing用のSRV ---
@@ -134,9 +136,15 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 	aliveCount_ = 0;
 
 	for (uint32_t index = 0; index < instanceCount_; ++index) {
-		// 生存期間を過ぎていたら、更新せず描画対象にしない
+		// 生存期間を過ぎていたら
 		if (particles_[index].lifeTime <= particles_[index].currentTime) {
-			continue;
+			if (isRespawn_ && updateMode_ == ParticleUpdateMode::kRandom) {
+				// 再発生がONなら、生成関数で新しい粒として生まれ直す
+				particles_[index] = MakeNewParticle(randomEngine_);
+			} else {
+				// 再発生しないなら、更新せず描画対象にしない
+				continue;
+			}
 		}
 
 		// 動かす設定のときだけ、位置と経過時間を進める
@@ -165,8 +173,25 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 		// 色はそのままコピーする
 		instancingData_[aliveCount_].color = particles_[index].color;
 
+		// 寿命に対して、どれだけ時間が経ったか (0.0～1.0)
+		const float lifeRatio = particles_[index].currentTime / particles_[index].lifeTime;
+
+		/// --- Dissolve ---
+
+		// Propertiesで設定した閾値を使う
+		float dissolveThreshold = dissolveThreshold_;
+		const bool isDissolveOverLife = isDissolveOverLife_ && updateMode_ == ParticleUpdateMode::kRandom;
+		if (isDissolveOverLife) {
+			// 寿命に合わせて閾値を上げ、抜ける部分を増やしていく (Windowsのmaxマクロと衝突しないように()で囲む)
+			dissolveThreshold = (std::max)(dissolveThreshold, lifeRatio);
+		}
+		instancingData_[aliveCount_].dissolveThreshold = dissolveThreshold;
+
+		/// --- α値 ---
+
 		// 経過時間に合わせてα値を1.0から0.0へ近づけ、徐々に消えていくようにする
-		const float alpha = 1.0f - (particles_[index].currentTime / particles_[index].lifeTime);
+		// 寿命でDissolveするときは、抜け方が見えるようにα値は1.0のままにする
+		const float alpha = isDissolveOverLife ? 1.0f : 1.0f - lifeRatio;
 		// 算出したα値をGPUに送る
 		instancingData_[aliveCount_].color.w = alpha;
 
