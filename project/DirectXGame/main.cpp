@@ -27,6 +27,7 @@
 #include "GraphicsDevice.h"
 #include "D3DResourceLeakChecker.h"
 #include "InstancingParticle.h"
+#include "ParticleEffect.h"
 #include "PrimitiveMesh.h"
 
 #include <cstdint> // int32_t
@@ -1306,6 +1307,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- ===== ----- /////
 
+		///// ----- Particle Effect ----- /////
+
+		/// --- 初期化 ---
+		// Instancing用SRVは、Instancing Particleの次の番号からグループの数だけ使う
+		constexpr uint32_t kParticleEffectSrvStartIndex = kInstancingParticleSrvIndex + 1;
+
+		// ぽわぽわと星を画面全体にちりばめるパーティクルエフェクト
+		ParticleEffect particleEffect;
+		particleEffect.Initialize(
+			device,
+			srvDescriptorHeap,
+			kParticleEffectSrvStartIndex,
+			textureManager);
+
+		// 表示の切り替え
+		bool isParticleEffectVisible = true;
+
+		///// ----- ===== ----- /////
+
 		///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 		// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1408,6 +1428,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			instancingParticleTextureMode,
 			isInstancingParticleVisible);
 
+		// ParticleEffectをHierarchyとPropertiesへ接続する
+		ParticleEffectEditorObject particleEffectEditor(
+			particleEffect,
+			"Particle Effect",
+			isParticleEffectVisible);
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1428,6 +1454,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&suzanneModelEditor,
 			&fenceModelEditor,
 			&instancingParticleEditor,
+			&particleEffectEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1840,6 +1867,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 速度で粒を動かし、Instancing ParticleのWVPを更新する
 			instancingParticle.Update(viewMatrix, projectionMatrix, deltaTime);
 
+			// ぽわぽわと星を発生・移動・消滅させ、WVPを更新する
+			particleEffect.Update(viewMatrix, projectionMatrix, deltaTime);
+
 			/// --- Object3D用WVPを計算する ---
 
 			/*
@@ -2053,18 +2083,31 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					fenceTextureHandle);
 			}
 
-			/// --- Instancing Particle描画 ---
+			/// --- パーティクル描画 ---
 
-			if (isInstancingParticleVisible) {
-				// 3Dオブジェクトを全て描画した後に、パーティクルを描画する
-				// Particle用のRootSignatureとPSOに切り替える (BlendModeはPropertiesで選択、初期値は加算)
+			// 3Dオブジェクトを全て描画した後に、パーティクルを描画する
+			if (isInstancingParticleVisible || isParticleEffectVisible) {
+				// Particle用のRootSignatureに切り替える
 				commandList->SetGraphicsRootSignature(particlePipelineState.GetRootSignature());
-				commandList->SetPipelineState(particlePipelineState.GetPipelineState(instancingParticle.GetBlendMode()));
 
-				// ImGuiで選択したテクスチャを貼って描画する
-				instancingParticle.Draw(
-					commandList,
-					textureManager.GetSrvHandle(static_cast<uint32_t>(instancingParticleTextureMode)));
+				/// --- Instancing Particle描画 ---
+
+				if (isInstancingParticleVisible) {
+					// BlendModeはPropertiesで選択 (初期値は加算)
+					commandList->SetPipelineState(particlePipelineState.GetPipelineState(instancingParticle.GetBlendMode()));
+
+					// ImGuiで選択したテクスチャを貼って描画する
+					instancingParticle.Draw(
+						commandList,
+						textureManager.GetSrvHandle(static_cast<uint32_t>(instancingParticleTextureMode)));
+				}
+
+				/// --- Particle Effect描画 ---
+
+				if (isParticleEffectVisible) {
+					// グループごとにBlendModeとテクスチャを切り替えて描画する
+					particleEffect.Draw(commandList, textureManager, particlePipelineState);
+				}
 
 				// 後に描くSpriteのために、Object3d用のRootSignatureとPSOへ戻す
 				commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());

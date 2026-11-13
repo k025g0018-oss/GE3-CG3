@@ -115,6 +115,49 @@ void InstancingParticle::Initialize(
 /// <param name="deltaTime"></param>
 void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix, float deltaTime) {
 
+	// 動かし方に合わせて粒を動かす
+	SimulateParticles(deltaTime);
+
+	// 生きている粒をGPUへ送る
+	TransferToGPU(viewMatrix, projectionMatrix);
+}
+
+/// <summary>
+/// 動かし方に合わせて、粒の位置と経過時間を進める
+/// </summary>
+/// <param name="deltaTime"></param>
+void InstancingParticle::SimulateParticles(float deltaTime) {
+
+	for (uint32_t index = 0; index < instanceCount_; ++index) {
+		// 生存期間を過ぎていたら
+		if (particles_[index].lifeTime <= particles_[index].currentTime) {
+			if (isRespawn_ && updateMode_ == ParticleUpdateMode::kRandom) {
+				// 再発生がONなら、生成関数で新しい粒として生まれ直す
+				particles_[index] = MakeNewParticle(randomEngine_);
+			} else {
+				// 再発生しないなら、更新しない
+				continue;
+			}
+		}
+
+		// 動かす設定のときだけ、位置と経過時間を進める
+		if (updateMode_ != ParticleUpdateMode::kNone) {
+			// 速度(m/s) × 経過時間(s) で位置を進める
+			particles_[index].transform.translate =
+				particles_[index].transform.translate + particles_[index].velocity * deltaTime;
+			// 経過時間を足す
+			particles_[index].currentTime += deltaTime;
+		}
+	}
+}
+
+/// <summary>
+/// 生きている粒だけをStructuredBufferへ書き込む
+/// </summary>
+/// <param name="viewMatrix"></param>
+/// <param name="projectionMatrix"></param>
+void InstancingParticle::TransferToGPU(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix) {
+
 	// 描画数が確保したResourceの数を超えないようにする
 	assert(instanceCount_ <= maxInstanceCount_);
 
@@ -130,30 +173,15 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 	// View, Projectionは全粒共通なので先にかけておく
 	const Matrix4x4 viewProjectionMatrix = Matrix4x4::Multiply(viewMatrix, projectionMatrix);
 
-	/// --- 時間の更新と描画数の決定 ---
+	/// --- 描画数の決定 ---
 
 	// 描画すべきインスタンス数を数え直す
 	aliveCount_ = 0;
 
 	for (uint32_t index = 0; index < instanceCount_; ++index) {
-		// 生存期間を過ぎていたら
+		// 生存期間を過ぎていたら、描画対象にしない
 		if (particles_[index].lifeTime <= particles_[index].currentTime) {
-			if (isRespawn_ && updateMode_ == ParticleUpdateMode::kRandom) {
-				// 再発生がONなら、生成関数で新しい粒として生まれ直す
-				particles_[index] = MakeNewParticle(randomEngine_);
-			} else {
-				// 再発生しないなら、更新せず描画対象にしない
-				continue;
-			}
-		}
-
-		// 動かす設定のときだけ、位置と経過時間を進める
-		if (updateMode_ != ParticleUpdateMode::kNone) {
-			// 速度(m/s) × 経過時間(s) で位置を進める
-			particles_[index].transform.translate =
-				particles_[index].transform.translate + particles_[index].velocity * deltaTime;
-			// 経過時間を足す
-			particles_[index].currentTime += deltaTime;
+			continue;
 		}
 
 		// 粒自身のTransformから行列を作る
@@ -189,9 +217,15 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 
 		/// --- α値 ---
 
+		// 発生直後は0.0から1.0へ近づけ、ふわっと現れるようにする
+		float fadeIn = 1.0f;
+		if (fadeInRatio_ > 0.0f) {
+			fadeIn = (std::min)(1.0f, lifeRatio / fadeInRatio_);
+		}
+
 		// 経過時間に合わせてα値を1.0から0.0へ近づけ、徐々に消えていくようにする
 		// 寿命でDissolveするときは、抜け方が見えるようにα値は1.0のままにする
-		const float alpha = isDissolveOverLife ? 1.0f : 1.0f - lifeRatio;
+		const float alpha = isDissolveOverLife ? 1.0f : (1.0f - lifeRatio) * fadeIn;
 		// 算出したα値をGPUに送る
 		instancingData_[aliveCount_].color.w = alpha;
 
@@ -295,7 +329,7 @@ Particle InstancingParticle::MakeNewParticle(std::mt19937& randomEngine) {
 	// -1.0～1.0の範囲に収まる一様な乱数を作る分布生成器
 	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 
-	Particle particle;
+	Particle particle{};
 	particle.transform.scale = {1.0f, 1.0f, 1.0f};
 	particle.transform.rotate = {0.0f, 0.0f, 0.0f};
 

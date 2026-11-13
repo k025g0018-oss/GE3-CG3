@@ -13,7 +13,9 @@ const char* kTextureModes[] = {
 	"3 : Monster Ball",
 	"4 : Checker Board",
 	"5 : Fence",
-	"6 : Noise"
+	"6 : Noise",
+	"7 : Powapowa",
+	"8 : Star"
 };
 }
 
@@ -595,5 +597,64 @@ void InstancingParticleEditorObject::DrawProperties() {
 }
 
 ///// ----- ===== ----- /////
+
+///// ----- ParticleEffect ----- /////
+
+ParticleEffectEditorObject::ParticleEffectEditorObject(
+	ParticleEffect& effect,
+	const char* name,
+	bool& isVisible)
+	: effect_(effect),
+	name_(name),
+	isVisible_(isVisible) {
+}
+
+void ParticleEffectEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Particle Effect Control");
+
+	// 描画をON/OFFする
+	ImGui::Checkbox("Draw Effect", &isVisible_);
+
+	const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
+
+	/// --- グループごと ---
+
+	for (std::unique_ptr<ParticleGroup>& group : effect_.GetGroups()) {
+		// グループ名ごとに折りたためるようにする
+		if (!ImGui::TreeNode(group->GetName().c_str())) {
+			continue;
+		}
+
+		InstancingParticle& particle = group->GetInstancingParticle();
+
+		// 1～最大数の範囲で使う粒の数を変更する
+		const uint32_t minCount = 1;
+		const uint32_t maxCount = particle.GetMaxInstanceCount();
+		ImGui::SliderScalar(
+			"Instance Count",
+			ImGuiDataType_U32,
+			&particle.GetInstanceCount(),
+			&minCount,
+			&maxCount
+		);
+
+		// 生きている (描画している) 粒の数を表示する
+		ImGui::Text("Alive Count : %u", particle.GetAliveCount());
+
+		// 描画に使うBlendModeを選ぶ
+		int blendModeIndex = static_cast<int>(group->GetBlendMode());
+		if (ImGui::Combo("Blend Mode", &blendModeIndex, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+			group->GetBlendMode() = static_cast<BlendMode>(blendModeIndex);
+		}
+
+		// グループ全体の色を変更する
+		ImGui::ColorEdit4("Color", &particle.GetColor().x);
+
+		// グループ全体の位置を動かす
+		ImGui::DragFloat3("Translate", &particle.GetTransform().translate.x, 0.01f);
+
+		ImGui::TreePop();
+	}
+}
 
 #endif // USE_IMGUI

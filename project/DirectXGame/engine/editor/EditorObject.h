@@ -8,6 +8,7 @@
 #include "Sphere.h"
 #include "Model.h"
 #include "InstancingParticle.h"
+#include "ParticleEffect.h"
 
 // ゲームオブジェクトをImGuiのHierarchyとPropertiesへ接続する共通ラッパー
 class IEditorObject {
@@ -176,6 +177,32 @@ private:
 
 	// Editorへ接続した時点のSRTをリセット先として保存する
 	Transform initialTransform_{};
+
+	// 描画するかどうかをmainと共有する
+	bool& isVisible_;
+};
+
+// ParticleEffectをHierarchyとPropertiesへ接続するラッパークラス
+class ParticleEffectEditorObject final : public IEditorObject {
+public:
+	ParticleEffectEditorObject(
+		ParticleEffect& effect,
+		const char* name,
+		bool& isVisible
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 描画本体は所有せず、mainで作成したParticleEffectを参照する
+	ParticleEffect& effect_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
 
 	// 描画するかどうかをmainと共有する
 	bool& isVisible_;

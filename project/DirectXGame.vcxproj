@@ -225,6 +225,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="DirectXGame\engine\3d\PrimitiveMesh.cpp" />
     <ClCompile Include="DirectXGame\engine\3d\InstancingParticle.cpp" />
     <ClCompile Include="DirectXGame\engine\3d\ParticleEffect.cpp" />
+    <ClCompile Include="DirectXGame\engine\3d\ParticleGroup.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\shaders\Object3d.PS.hlsl">
@@ -314,6 +315,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="DirectXGame\engine\3d\PrimitiveMesh.h" />
     <ClInclude Include="DirectXGame\engine\3d\InstancingParticle.h" />
     <ClInclude Include="DirectXGame\engine\3d\ParticleEffect.h" />
+    <ClInclude Include="DirectXGame\engine\3d\ParticleGroup.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Memo.txt" />

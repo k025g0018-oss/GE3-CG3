@@ -33,7 +33,9 @@ void TextureManager::Initialize(GraphicsDevice* graphicsDevice) {
 		"resources/images/monsterBall.png",
 		"resources/images/checkerBoard.png",
 		"resources/models/fence/fence.png",
-		"resources/images/noise.png"
+		"resources/images/noise.png",
+		"resources/images/particle/powapowaParticle.png",
+		"resources/images/particle/starParticle.png"
 	};
 
 	// ImGuiが0番を使うため、Texture用SRVは1番から使用する
@@ -108,6 +110,14 @@ uint32_t TextureManager::FindTextureIndex(
 
 	if (fileName == "noise.png") {
 		return 6;
+	}
+
+	if (fileName == "powapowaParticle.png") {
+		return 7;
+	}
+
+	if (fileName == "starParticle.png") {
+		return 8;
 	}
 
 	// 対応する画像がない場合は白テクスチャを使う

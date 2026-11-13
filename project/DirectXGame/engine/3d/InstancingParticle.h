@@ -30,6 +30,12 @@ struct Particle {
 	float lifeTime;
 	// 発生してからの経過時間 (s)
 	float currentTime;
+	// 回転の速さ (rad/s)
+	Vector3 angularVelocity{};
+	// 発生時の大きさ (拡縮の基準)
+	Vector3 baseScale{1.0f, 1.0f, 1.0f};
+	// 拡縮の速さ (rad/s) 0なら大きさは変化しない
+	float scalePulseSpeed = 0.0f;
 };
 
 ///// ----- ===== ----- /////
@@ -96,12 +102,21 @@ public:
 
 	/// <summary>
 	/// 更新
-	/// 速度で粒を動かし、粒ごとのTransformからwvp行列を作ってStructuredBufferへ書き込む
+	/// 速度で粒を動かし (SimulateParticles)、StructuredBufferへ書き込む (TransferToGPU)
 	/// </summary>
 	/// <param name="viewMatrix"></param>
 	/// <param name="projectionMatrix"></param>
 	/// <param name="deltaTime">前のフレームからの経過時間 (秒)</param>
 	void Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix, float deltaTime);
+
+	/// <summary>
+	/// GPUへの転送
+	/// 生きている粒だけを前から詰めて、wvp・World・色などをStructuredBufferへ書き込む
+	/// 動かし方を外側 (ParticleGroupなど) で決めるときは、粒を動かした後にこれだけを呼ぶ
+	/// </summary>
+	/// <param name="viewMatrix"></param>
+	/// <param name="projectionMatrix"></param>
+	void TransferToGPU(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix);
 
 	/// <summary>
 	/// 描画
@@ -200,6 +215,14 @@ public:
 		return isDissolveOverLife_;
 	}
 
+	/// <summary>
+	/// 粒のデータを取得する (外側で動かし方を決めるときに使う)
+	/// </summary>
+	/// <returns></returns>
+	std::vector<Particle>& GetParticles() {
+		return particles_;
+	}
+
 	///// ----- ===== ----- /////
 
 	///// ----- setter ----- /////
@@ -211,6 +234,14 @@ public:
 	/// <param name="updateMode"></param>
 	void SetUpdateMode(ParticleUpdateMode updateMode);
 
+	/// <summary>
+	/// 寿命のうち、最初のどれだけの割合でフェードインさせるかを設定する (0.0ならフェードインしない)
+	/// </summary>
+	/// <param name="fadeInRatio"></param>
+	void SetFadeInRatio(float fadeInRatio) {
+		fadeInRatio_ = fadeInRatio;
+	}
+
 	///// ----- ===== ----- /////
 
 private:
@@ -220,6 +251,12 @@ private:
 	/// 粒を最初の並びに戻す (斜めに少しずつずらし、速度は真上)
 	/// </summary>
 	void ResetParticles();
+
+	/// <summary>
+	/// 動かし方 (Normal / Random) に合わせて、粒の位置と経過時間を進める
+	/// </summary>
+	/// <param name="deltaTime"></param>
+	void SimulateParticles(float deltaTime);
 
 	/// <summary>
 	/// 位置と速度がランダムな粒を1つ生成する
@@ -265,6 +302,9 @@ private:
 
 	// Randomのとき、寿命に合わせて閾値を上げていくかどうか
 	bool isDissolveOverLife_ = false;
+
+	// 寿命のうち、フェードインに使う割合 (0.0ならフェードインしない)
+	float fadeInRatio_ = 0.0f;
 
 	// 乱数生成器
 	std::mt19937 randomEngine_;
