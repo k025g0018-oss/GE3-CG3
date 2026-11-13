@@ -178,20 +178,22 @@ void GraphicsDevice::PostDraw() {
 
 	/// --- ImGuiの描画 ---
 
+	// エディター表示中 (Scene用テクスチャが設定されている) ときだけImGuiを描画する
+	// エディター非表示中はゲーム画面がBackBufferに直接描かれているので、そのまま表示する
 	if (sceneRenderTexture_) {
 		// ゲーム描画をImGuiから読める状態へ戻す
 		sceneRenderTexture_->TransitionToShaderResource(commandList);
-	}
-	// UIはバックバッファへ描画する
-	commandList->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], false, nullptr);
-	if (sceneRenderTexture_) {
+
+		// UIはバックバッファへ描画する
+		commandList->OMSetRenderTargets(1, &rtvHandles_[backBufferIndex], false, nullptr);
 		const float editorClearColor[] = {0.08f, 0.08f, 0.08f, 1.0f};
 		commandList->ClearRenderTargetView(rtvHandles_[backBufferIndex], editorClearColor, 0, nullptr);
+
+		// ImGuiは現在のバックバッファ全体へ描画する
+		commandList->RSSetViewports(1, &backBufferViewport_);
+		commandList->RSSetScissorRects(1, &backBufferScissorRect_);
+		DrawImGui();
 	}
-	// ImGuiは現在のバックバッファ全体へ描画する
-	commandList->RSSetViewports(1, &backBufferViewport_);
-	commandList->RSSetScissorRects(1, &backBufferScissorRect_);
-	DrawImGui();
 
 #endif // USE_IMGUI
 

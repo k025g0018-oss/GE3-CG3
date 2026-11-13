@@ -397,6 +397,8 @@ void DrawStatistics(
 	bool& isTeapotVisible,
 	bool& isSuzanneVisible,
 	bool& isFenceVisible,
+	bool& isInstancingParticleVisible,
+	bool& isParticleEffectVisible,
 	bool& isSpriteVisible
 ) {
 
@@ -451,6 +453,8 @@ void DrawStatistics(
 		isTeapotVisible = true;
 		isSuzanneVisible = true;
 		isFenceVisible = true;
+		isInstancingParticleVisible = true;
+		isParticleEffectVisible = true;
 		isSpriteVisible = true;
 	}
 
@@ -470,6 +474,8 @@ void DrawStatistics(
 		isTeapotVisible = false;
 		isSuzanneVisible = false;
 		isFenceVisible = false;
+		isInstancingParticleVisible = false;
+		isParticleEffectVisible = false;
 		isSpriteVisible = false;
 	}
 
@@ -1345,6 +1351,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// ゲーム画面の描画先をGraphicsDeviceに教える
 		graphicsDevice->SetSceneRenderTexture(&sceneRenderTexture);
 
+		// エディターを表示するかどうか (Enterキーで切り替える)
+		// 非表示のときは、Release実行時と同じくゲーム画面だけをウィンドウ全体に描画する
+		bool isEditorVisible = true;
+
 		// ImGuiの初期化はGraphicsDeviceで済んでいるので、入力の情報だけ受け取る
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -1485,11 +1495,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #ifdef USE_IMGUI
 
-			// エディター有効時は、WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
-			// (エディター無効時はBackBufferを1280x720のままにして、ウィンドウに合わせて引き伸ばして表示する)
-			if (graphicsDevice->Resize(clientWidth, clientHeight)) {
-				// 作り直したときは、カメラの縦横比も新しい大きさに合わせる
-				camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
+			if (isEditorVisible) {
+				// エディター有効時は、WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
+				if (graphicsDevice->Resize(clientWidth, clientHeight)) {
+					// 作り直したときは、カメラの縦横比も新しい大きさに合わせる
+					camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
+				}
+			} else {
+				// エディター無効時は、Release実行時と同じくBackBufferを1280x720に戻し、ウィンドウに合わせて引き伸ばして表示する
+				if (graphicsDevice->Resize(Window::kClientWidth, Window::kClientHeight)) {
+					// 作り直したときは、カメラの縦横比も1280x720に合わせる
+					camera.SetAspectRatio(static_cast<float>(Window::kClientWidth) / static_cast<float>(Window::kClientHeight));
+				}
 			}
 
 #endif // USE_IMGUI
@@ -1716,6 +1733,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				isTeapotVisible,
 				isSuzanneVisible,
 				isFenceVisible,
+				isInstancingParticleVisible,
+				isParticleEffectVisible,
 				isSpriteVisible
 			);
 			DrawFlowGraph(particleSystem, primitive3D);
@@ -1736,6 +1755,26 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			if (input->IsTrigger(DIK_1)) {
 				OutputDebugStringA("1\n");
 			}
+
+#ifdef USE_IMGUI
+
+			// Enterキーを押した瞬間にエディターの表示を切り替える (ImGuiで文字を入力しているときは除く)
+			if (input->IsTrigger(DIK_RETURN) && !ImGui::GetIO().WantTextInput) {
+				isEditorVisible = !isEditorVisible;
+
+				// エディター表示中だけ、ゲーム画面をScene用テクスチャへ描画する (nullptrならBackBufferへ直接描画する)
+				graphicsDevice->SetSceneRenderTexture(isEditorVisible ? &sceneRenderTexture : nullptr);
+
+				// エディター非表示中は、見えないImGuiがマウスやキーボードの入力を受け取らないようにする
+				ImGuiIO& editorIO = ImGui::GetIO();
+				if (isEditorVisible) {
+					editorIO.ConfigFlags &= ~(ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
+				} else {
+					editorIO.ConfigFlags |= ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard;
+				}
+			}
+
+#endif // USE_IMGUI
 
 			// Spaceキーを押した瞬間に使用するカメラを切り替える
 			if (input->IsTrigger(DIK_SPACE)) {
