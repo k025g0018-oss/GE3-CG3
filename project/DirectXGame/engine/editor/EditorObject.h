@@ -11,6 +11,9 @@
 #include "ParticleEffect.h"
 #include "MouseParticleEffect.h"
 #include "CameraShake.h"
+#include "TuningFile.h"
+
+#include <string>
 
 // ゲームオブジェクトをImGuiのHierarchyとPropertiesへ接続する共通ラッパー
 class IEditorObject {
@@ -256,6 +259,39 @@ private:
 
 	// Hierarchyへ表示する名前
 	const char* name_;
+};
+
+// TuningFile (調整値の保存・読み込み) をHierarchyとPropertiesへ接続するラッパークラス
+class TuningFileEditorObject final : public IEditorObject {
+public:
+	TuningFileEditorObject(
+		TuningFile& tuningFile,
+		const char* name,
+		const std::string& filePath,
+		bool& isAutoReload
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 本体は所有せず、mainで作成したTuningFileを参照する
+	TuningFile& tuningFile_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
+
+	// 保存・読み込みするファイル
+	std::string filePath_;
+
+	// ホットリロードするかどうかをmainと共有する
+	bool& isAutoReload_;
+
+	// 最後に行った操作の結果
+	std::string message_;
 };
 
 #endif // USE_IMGUI

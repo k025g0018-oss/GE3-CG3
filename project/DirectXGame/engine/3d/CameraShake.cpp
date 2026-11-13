@@ -1,4 +1,5 @@
 #include "CameraShake.h"
+#include "TuningFile.h"
 
 /// <summary>
 /// 初期化
@@ -61,4 +62,15 @@ Matrix4x4 CameraShake::ApplyToView(const Matrix4x4& viewMatrix) const {
 
 	// View行列の後ろに掛ける (ワールド → View空間 → ずらす の順)
 	return Matrix4x4::Multiply(viewMatrix, shakeMatrix);
+}
+
+/// <summary>
+/// 調整値を登録する
+/// </summary>
+/// <param name="tuningFile"></param>
+void CameraShake::RegisterTuning(TuningFile& tuningFile) {
+
+	tuningFile.Add("shake.isEnabled", &isEnabled_);
+	tuningFile.Add("shake.duration", &duration_);
+	tuningFile.Add("shake.amplitude", &amplitude_);
 }

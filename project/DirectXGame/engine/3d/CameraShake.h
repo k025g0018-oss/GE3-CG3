@@ -5,6 +5,9 @@
 
 #include <random>
 
+// 前方宣言
+class TuningFile;
+
 ///// ----- 画面シェイク ----- /////
 
 /// <summary>
@@ -38,6 +41,12 @@ public:
 	/// <param name="viewMatrix">カメラのView行列</param>
 	/// <returns>揺れを加えたView行列 (揺れていないときはそのまま)</returns>
 	Matrix4x4 ApplyToView(const Matrix4x4& viewMatrix) const;
+
+	/// <summary>
+	/// 調整値を、保存・読み込みできるように登録する (shake.項目名)
+	/// </summary>
+	/// <param name="tuningFile"></param>
+	void RegisterTuning(TuningFile& tuningFile);
 
 	///// ----- ===== ----- /////
 

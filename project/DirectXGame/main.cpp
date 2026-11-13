@@ -30,6 +30,7 @@
 #include "ParticleEffect.h"
 #include "MouseParticleEffect.h"
 #include "CameraShake.h"
+#include "TuningFile.h"
 #include "PrimitiveMesh.h"
 
 #include <cstdint> // int32_t
@@ -1427,6 +1428,25 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- ===== ----- /////
 
+		///// ----- 調整値の保存・読み込み ----- /////
+
+		// パーティクルの数やランダムの範囲を保存するcsv
+		const std::string kParticleTuningFilePath = "resources/tuning/particleTuning.csv";
+
+		// 保存・読み込みする値を登録する
+		TuningFile particleTuning;
+		particleEffect.RegisterTuning(particleTuning);
+		mouseParticleEffect.RegisterTuning(particleTuning);
+		cameraShake.RegisterTuning(particleTuning);
+
+		// 保存してあれば、その値で始める
+		particleTuning.Load(kParticleTuningFilePath);
+
+		// csvが書き換えられたら自動で読み込み直すか
+		bool isParticleTuningHotReload = true;
+
+		///// ----- ===== ----- /////
+
 		///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 		// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1557,6 +1577,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			cameraShake,
 			"Camera Shake");
 
+		// 調整値の保存・読み込みをHierarchyとPropertiesへ接続する
+		TuningFileEditorObject particleTuningEditor(
+			particleTuning,
+			"Particle Tuning",
+			kParticleTuningFilePath,
+			isParticleTuningHotReload);
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1581,6 +1608,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&backgroundEditor,
 			&mouseParticleEffectEditor,
 			&cameraShakeEditor,
+			&particleTuningEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1975,6 +2003,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			}
 
 			///// ----- ゲームの処理 ----- /////
+
+			/// --- 調整値のホットリロード ---
+
+			// csvが書き換えられていたら読み込み直す
+			if (isParticleTuningHotReload) {
+				particleTuning.ReloadIfChanged(kParticleTuningFilePath);
+			}
 
 			/// --- カメラ ---
 

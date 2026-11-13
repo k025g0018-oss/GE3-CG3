@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 
+// 前方宣言
+class TuningFile;
+
 ///// ----- パーティクルグループの設定 ----- /////
 
 /// <summary>
@@ -159,6 +162,13 @@ public:
 	/// <param name="worldPosition">発生させる位置 (ワールド座標、m)</param>
 	/// <param name="count">発生させる数</param>
 	void Emit(const Vector3& worldPosition, uint32_t count);
+
+	/// <summary>
+	/// 数やランダムの範囲などの調整値を、保存・読み込みできるように登録する
+	/// </summary>
+	/// <param name="tuningFile"></param>
+	/// <param name="prefix">ファイルに書く名前の頭 (例: effect.Star)</param>
+	void RegisterTuning(TuningFile& tuningFile, const std::string& prefix);
 
 	///// ----- ===== ----- /////
 

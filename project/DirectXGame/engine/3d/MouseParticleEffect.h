@@ -8,6 +8,7 @@
 // 前方宣言
 class TextureManager;
 class PipelineState;
+class TuningFile;
 
 ///// ----- マウスのパーティクルエフェクト ----- /////
 
@@ -81,6 +82,12 @@ public:
 	/// 終了処理
 	/// </summary>
 	void Finalize();
+
+	/// <summary>
+	/// 調整値を、保存・読み込みできるように登録する (mouse.項目名)
+	/// </summary>
+	/// <param name="tuningFile"></param>
+	void RegisterTuning(TuningFile& tuningFile);
 
 	/// <summary>
 	/// 画面上の位置を、Z=planeZの平面上のワールド座標に変換する

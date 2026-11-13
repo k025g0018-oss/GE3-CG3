@@ -1,4 +1,5 @@
 #include "ParticleGroup.h"
+#include "TuningFile.h"
 
 #include <algorithm>
 #include <cassert>
@@ -110,6 +111,56 @@ void ParticleGroup::Emit(const Vector3& worldPosition, uint32_t count) {
 
 		++emitCount;
 	}
+}
+
+/// <summary>
+/// 調整値を登録する
+/// </summary>
+/// <param name="tuningFile"></param>
+/// <param name="prefix"></param>
+void ParticleGroup::RegisterTuning(TuningFile& tuningFile, const std::string& prefix) {
+
+	/// --- 数 ---
+
+	tuningFile.Add(prefix + ".count", &instancingParticle_.GetInstanceCount(), 1, settings_.maxCount);
+
+	/// --- 発生範囲・大きさ ---
+
+	tuningFile.Add(prefix + ".spawnMin", &settings_.spawnMin);
+	tuningFile.Add(prefix + ".spawnMax", &settings_.spawnMax);
+	tuningFile.Add(prefix + ".scaleMin", &settings_.scaleMin);
+	tuningFile.Add(prefix + ".scaleMax", &settings_.scaleMax);
+
+	/// --- 移動 ---
+
+	tuningFile.Add(prefix + ".speedMin", &settings_.speedMin);
+	tuningFile.Add(prefix + ".speedMax", &settings_.speedMax);
+	tuningFile.Add(prefix + ".isUpward", &settings_.isUpward);
+	tuningFile.Add(prefix + ".spreadAngle", &settings_.spreadAngle);
+	tuningFile.Add(prefix + ".acceleration", &settings_.acceleration);
+	tuningFile.Add(prefix + ".drag", &settings_.drag);
+
+	/// --- 回転・拡縮 ---
+
+	tuningFile.Add(prefix + ".angularSpeedMin", &settings_.angularSpeedMin);
+	tuningFile.Add(prefix + ".angularSpeedMax", &settings_.angularSpeedMax);
+	tuningFile.Add(prefix + ".isRotateAllAxes", &settings_.isRotateAllAxes);
+	tuningFile.Add(prefix + ".scalePulseAmount", &settings_.scalePulseAmount);
+	tuningFile.Add(prefix + ".scalePulseSpeedMin", &settings_.scalePulseSpeedMin);
+	tuningFile.Add(prefix + ".scalePulseSpeedMax", &settings_.scalePulseSpeedMax);
+	tuningFile.Add(prefix + ".isShrinkOverLife", &settings_.isShrinkOverLife);
+
+	/// --- 寿命 ---
+
+	tuningFile.Add(prefix + ".lifeTimeMin", &settings_.lifeTimeMin);
+	tuningFile.Add(prefix + ".lifeTimeMax", &settings_.lifeTimeMax);
+	tuningFile.Add(prefix + ".fadeInRatio", &settings_.fadeInRatio);
+
+	/// --- 色 ---
+
+	tuningFile.Add(prefix + ".isRandomColor", &settings_.isRandomColor);
+	tuningFile.Add(prefix + ".hueShiftSpeed", &settings_.hueShiftSpeed);
+	tuningFile.Add(prefix + ".tintColor", &settings_.tintColor);
 }
 
 /// <summary>

@@ -2,6 +2,7 @@
 #include "PipelineState.h"
 #include "PrimitiveMesh.h"
 #include "TextureManager.h"
+#include "TuningFile.h"
 
 #include <cmath>
 #include <numbers>
@@ -215,6 +216,29 @@ void MouseParticleEffect::Finalize() {
 	burstGroup_.Finalize();
 	trailGroup_.Finalize();
 	cursor_.Finalize();
+}
+
+/// <summary>
+/// 調整値を登録する
+/// </summary>
+/// <param name="tuningFile"></param>
+void MouseParticleEffect::RegisterTuning(TuningFile& tuningFile) {
+
+	/// --- 発生 ---
+
+	tuningFile.Add("mouse.burstCount", &burstCount_, 1, 1000);
+	tuningFile.Add("mouse.trailEmitInterval", &trailEmitInterval_);
+
+	/// --- カーソルの輪 ---
+
+	tuningFile.Add("mouse.isCursorVisible", &isCursorVisible_);
+	tuningFile.Add("mouse.cursorScale", &cursor_.GetTransform().scale);
+	tuningFile.Add("mouse.cursorColor", &cursor_.GetColor());
+
+	/// --- パーティクル ---
+
+	burstGroup_.RegisterTuning(tuningFile, "mouse.burst");
+	trailGroup_.RegisterTuning(tuningFile, "mouse.trail");
 }
 
 /// <summary>

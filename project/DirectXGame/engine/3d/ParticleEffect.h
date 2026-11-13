@@ -10,6 +10,7 @@
 // 前方宣言
 class TextureManager;
 class PipelineState;
+class TuningFile;
 
 ///// ----- パーティクルエフェクト ----- /////
 
@@ -71,6 +72,12 @@ public:
 	/// 終了処理
 	/// </summary>
 	void Finalize();
+
+	/// <summary>
+	/// 全てのグループの調整値を、保存・読み込みできるように登録する (effect.グループ名.項目名)
+	/// </summary>
+	/// <param name="tuningFile"></param>
+	void RegisterTuning(TuningFile& tuningFile);
 
 	///// ----- ===== ----- /////
 

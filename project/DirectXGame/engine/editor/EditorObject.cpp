@@ -776,4 +776,48 @@ void CameraShakeEditorObject::DrawProperties() {
 	ImGui::TextUnformatted(cameraShake_.IsShaking() ? "Shaking" : "Idle");
 }
 
+///// ----- ===== ----- /////
+
+///// ----- TuningFile ----- /////
+
+TuningFileEditorObject::TuningFileEditorObject(
+	TuningFile& tuningFile,
+	const char* name,
+	const std::string& filePath,
+	bool& isAutoReload)
+	: tuningFile_(tuningFile),
+	name_(name),
+	filePath_(filePath),
+	isAutoReload_(isAutoReload) {
+}
+
+void TuningFileEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Particle Tuning (CSV)");
+	ImGui::TextDisabled("%s", filePath_.c_str());
+
+	/// --- 保存・読み込み ---
+
+	// 今の値をcsvへ書き出す
+	if (ImGui::Button("Save")) {
+		message_ = tuningFile_.Save(filePath_) ? "Saved" : "Save Failed";
+	}
+
+	ImGui::SameLine();
+
+	// csvの値を読み込み直す
+	if (ImGui::Button("Reload")) {
+		message_ = tuningFile_.Load(filePath_) ? "Reloaded" : "File Not Found";
+	}
+
+	/// --- ホットリロード ---
+
+	// csvが書き換えられたら自動で読み込み直す
+	ImGui::Checkbox("Hot Reload", &isAutoReload_);
+
+	// 最後の操作の結果
+	if (!message_.empty()) {
+		ImGui::Text("Result : %s", message_.c_str());
+	}
+}
+
 #endif // USE_IMGUI

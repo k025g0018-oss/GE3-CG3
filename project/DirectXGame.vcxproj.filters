@@ -202,6 +202,9 @@
     <ClCompile Include="DirectXGame\engine\3d\CameraShake.cpp">
       <Filter>DirectXGame\engine\3d</Filter>
     </ClCompile>
+    <ClCompile Include="DirectXGame\engine\io\TuningFile.cpp">
+      <Filter>DirectXGame\engine\io</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\shaders\Object3d.VS.hlsl" />
@@ -377,6 +380,9 @@
     </ClInclude>
     <ClInclude Include="DirectXGame\engine\3d\CameraShake.h">
       <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\io\TuningFile.h">
+      <Filter>DirectXGame\engine\io</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

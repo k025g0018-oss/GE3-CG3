@@ -2,6 +2,7 @@
 #include "PipelineState.h"
 #include "PrimitiveMesh.h"
 #include "TextureManager.h"
+#include "TuningFile.h"
 
 #include <cassert>
 #include <numbers>
@@ -164,6 +165,17 @@ void ParticleEffect::Finalize() {
 		group->Finalize();
 	}
 	groups_.clear();
+}
+
+/// <summary>
+/// 全てのグループの調整値を登録する
+/// </summary>
+/// <param name="tuningFile"></param>
+void ParticleEffect::RegisterTuning(TuningFile& tuningFile) {
+
+	for (std::unique_ptr<ParticleGroup>& group : groups_) {
+		group->RegisterTuning(tuningFile, "effect." + group->GetName());
+	}
 }
 
 /// <summary>
