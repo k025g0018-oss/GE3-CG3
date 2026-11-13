@@ -90,15 +90,15 @@ void InstancingParticle::Initialize(
 	instancingSrvHandleGPU_ = srvDescriptorHeap.GetGPUHandle(srvIndex);
 	device->CreateShaderResourceView(instancingResource_.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
 
-	/// --- 粒ごとのTransform ---
+	/// --- 粒ごとのTransformと速度 ---
 
-	// それぞれ位置が少しずつずれるように初期化する
-	instanceTransforms_.resize(maxInstanceCount_);
-	for (uint32_t index = 0; index < maxInstanceCount_; ++index) {
-		instanceTransforms_[index].scale = {1.0f, 1.0f, 1.0f};
-		instanceTransforms_[index].rotate = {0.0f, 0.0f, 0.0f};
-		instanceTransforms_[index].translate = {index * 0.1f, index * 0.1f, index * 0.1f};
-	}
+	// 乱数生成器をランダムなシードで初期化する
+	std::random_device seedGenerator;
+	randomEngine_.seed(seedGenerator());
+
+	// 最初の並びに設定する
+	particles_.resize(maxInstanceCount_);
+	ResetParticles();
 
 	// 片面の板の表側が初期状態でカメラに向くようにする
 	transform_.rotate.y = std::numbers::pi_v<float>;
@@ -109,10 +109,21 @@ void InstancingParticle::Initialize(
 /// </summary>
 /// <param name="viewMatrix"></param>
 /// <param name="projectionMatrix"></param>
-void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix) {
+/// <param name="deltaTime"></param>
+void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix, float deltaTime) {
 
 	// 描画数が確保したResourceの数を超えないようにする
 	assert(instanceCount_ <= maxInstanceCount_);
+
+	/// --- 移動 ---
+
+	// 動かす設定のときだけ、速度(m/s) × 経過時間(s) で位置を進める
+	if (updateMode_ != ParticleUpdateMode::kNone) {
+		for (uint32_t index = 0; index < instanceCount_; ++index) {
+			particles_[index].transform.translate =
+				particles_[index].transform.translate + particles_[index].velocity * deltaTime;
+		}
+	}
 
 	/// --- 共通の行列 ---
 
@@ -131,9 +142,9 @@ void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& pr
 	for (uint32_t index = 0; index < instanceCount_; ++index) {
 		// 粒自身のTransformから行列を作る
 		const Matrix4x4 localMatrix = Matrix4x4::MakeAffineMatrix(
-			instanceTransforms_[index].scale,
-			instanceTransforms_[index].rotate,
-			instanceTransforms_[index].translate
+			particles_[index].transform.scale,
+			particles_[index].transform.rotate,
+			particles_[index].transform.translate
 		);
 
 		// 粒 -> 親 の順にかけてWorld行列を作る
@@ -186,4 +197,68 @@ void InstancingParticle::Finalize() {
 	vertexBuffer_.Finalize();
 	materialData_ = nullptr;
 	instancingData_ = nullptr;
+}
+
+/// <summary>
+/// 動かし方を切り替える
+/// </summary>
+/// <param name="updateMode"></param>
+void InstancingParticle::SetUpdateMode(ParticleUpdateMode updateMode) {
+
+	updateMode_ = updateMode;
+
+	if (updateMode_ == ParticleUpdateMode::kRandom) {
+		// 生成関数を使って、全ての粒をランダムに作り直す
+		for (uint32_t index = 0; index < maxInstanceCount_; ++index) {
+			particles_[index] = MakeNewParticle(randomEngine_);
+		}
+	} else {
+		// それ以外は最初の並びに戻す
+		ResetParticles();
+	}
+}
+
+/// <summary>
+/// 粒を最初の並びに戻す
+/// </summary>
+void InstancingParticle::ResetParticles() {
+
+	for (uint32_t index = 0; index < maxInstanceCount_; ++index) {
+		// それぞれ位置が少しずつずれるように並べる
+		particles_[index].transform.scale = {1.0f, 1.0f, 1.0f};
+		particles_[index].transform.rotate = {0.0f, 0.0f, 0.0f};
+		particles_[index].transform.translate = {index * 0.1f, index * 0.1f, index * 0.1f};
+
+		// 速度を上向きに設定 (1m/s)
+		particles_[index].velocity = {0.0f, 1.0f, 0.0f};
+	}
+}
+
+/// <summary>
+/// 位置と速度がランダムな粒を1つ生成する
+/// </summary>
+/// <param name="randomEngine"></param>
+/// <returns></returns>
+Particle InstancingParticle::MakeNewParticle(std::mt19937& randomEngine) {
+
+	// -1.0～1.0の範囲に収まる一様な乱数を作る分布生成器
+	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
+	Particle particle;
+	particle.transform.scale = {1.0f, 1.0f, 1.0f};
+	particle.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+	// 位置と速度を[-1,1]でランダムに初期化 (位置はm、速度はm/s)
+	particle.transform.translate = {
+		distribution(randomEngine),
+		distribution(randomEngine),
+		distribution(randomEngine)
+	};
+	particle.velocity = {
+		distribution(randomEngine),
+		distribution(randomEngine),
+		distribution(randomEngine)
+	};
+
+	return particle;
 }

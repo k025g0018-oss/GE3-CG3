@@ -519,6 +519,25 @@ void InstancingParticleEditorObject::DrawProperties() {
 		&maxCount
 	);
 
+	/// --- Update ---
+
+	// 動かし方を選ぶ (NormalとRandomは同時にオンにならない、外すと最初の並びに戻る)
+	ImGui::SeparatorText("Update");
+
+	const ParticleUpdateMode updateMode = particle_.GetUpdateMode();
+
+	// 真上に動かす
+	bool isNormal = (updateMode == ParticleUpdateMode::kNormal);
+	if (ImGui::Checkbox("Normal", &isNormal)) {
+		particle_.SetUpdateMode(isNormal ? ParticleUpdateMode::kNormal : ParticleUpdateMode::kNone);
+	}
+
+	// ランダムに動かす
+	bool isRandom = (updateMode == ParticleUpdateMode::kRandom);
+	if (ImGui::Checkbox("Random", &isRandom)) {
+		particle_.SetUpdateMode(isRandom ? ParticleUpdateMode::kRandom : ParticleUpdateMode::kNone);
+	}
+
 	/// --- 見た目 ---
 
 	// 粒共通の色を変更する

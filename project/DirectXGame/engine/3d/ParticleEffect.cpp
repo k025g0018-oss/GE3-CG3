@@ -18,10 +18,10 @@ void ParticleEffect::Initialize(ID3D12Device* device) {
 /// </summary>
 /// <param name="viewMatrix"></param>
 /// <param name="projectionMatrix"></param>
-void ParticleEffect::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix) {
+void ParticleEffect::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix, float deltaTime) {
 
 	for (std::unique_ptr<InstancingParticle>& group : groups_) {
-		group->Update(viewMatrix, projectionMatrix);
+		group->Update(viewMatrix, projectionMatrix, deltaTime);
 	}
 }
 

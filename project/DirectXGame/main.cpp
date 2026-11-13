@@ -1837,8 +1837,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				viewMatrix,
 				projectionMatrix);
 
-			// Instancing ParticleのWVPを更新する
-			instancingParticle.Update(viewMatrix, projectionMatrix);
+			// 速度で粒を動かし、Instancing ParticleのWVPを更新する
+			instancingParticle.Update(viewMatrix, projectionMatrix, deltaTime);
 
 			/// --- Object3D用WVPを計算する ---
 

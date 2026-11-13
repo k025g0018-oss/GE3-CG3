@@ -9,8 +9,35 @@
 
 #include <cstdint>
 #include <d3d12.h>
+#include <random>
 #include <vector>
 #include <wrl.h>
+
+///// ----- パーティクル1粒 ----- /////
+
+/// <summary>
+/// 移動させるためにTransformと速度を持つ
+/// </summary>
+struct Particle {
+	Transform transform;
+	// 速度 (m/s)
+	Vector3 velocity;
+};
+
+///// ----- ===== ----- /////
+
+///// ----- 更新の種類 ----- /////
+
+/// <summary>
+/// パーティクルの動かし方
+/// </summary>
+enum class ParticleUpdateMode {
+	kNone,   // 動かさない (初期の並び)
+	kNormal, // 真上に動く
+	kRandom, // ランダムな位置・速度で動く
+};
+
+///// ----- ===== ----- /////
 
 ///// ----- インスタンシングParticle ----- /////
 
@@ -45,11 +72,12 @@ public:
 
 	/// <summary>
 	/// 更新
-	/// 粒ごとのTransformからwvp行列を作り、StructuredBufferへ書き込む
+	/// 速度で粒を動かし、粒ごとのTransformからwvp行列を作ってStructuredBufferへ書き込む
 	/// </summary>
 	/// <param name="viewMatrix"></param>
 	/// <param name="projectionMatrix"></param>
-	void Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix);
+	/// <param name="deltaTime">前のフレームからの経過時間 (秒)</param>
+	void Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix, float deltaTime);
 
 	/// <summary>
 	/// 描画
@@ -100,10 +128,42 @@ public:
 		return materialData_->color;
 	}
 
+	/// <summary>
+	/// 今の動かし方を取得する
+	/// </summary>
+	/// <returns></returns>
+	ParticleUpdateMode GetUpdateMode() const {
+		return updateMode_;
+	}
+
+	///// ----- ===== ----- /////
+
+	///// ----- setter ----- /////
+
+	/// <summary>
+	/// 動かし方を切り替える
+	/// 切り替えたら、粒の位置と速度を設定し直す
+	/// </summary>
+	/// <param name="updateMode"></param>
+	void SetUpdateMode(ParticleUpdateMode updateMode);
+
 	///// ----- ===== ----- /////
 
 private:
 	///// ----- メンバ関数 ----- /////
+
+	/// <summary>
+	/// 粒を最初の並びに戻す (斜めに少しずつずらし、速度は真上)
+	/// </summary>
+	void ResetParticles();
+
+	/// <summary>
+	/// 位置と速度がランダムな粒を1つ生成する
+	/// 消滅・生成を繰り返すときにも使う
+	/// </summary>
+	/// <param name="randomEngine">乱数生成器</param>
+	/// <returns>生成した粒</returns>
+	Particle MakeNewParticle(std::mt19937& randomEngine);
 
 	///// ----- ===== ----- /////
 
@@ -121,8 +181,14 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	Material* materialData_ = nullptr;
 
-	// 粒ごとのTransform (最大数分)
-	std::vector<Transform> instanceTransforms_;
+	// 粒ごとのTransformと速度 (最大数分)
+	std::vector<Particle> particles_;
+
+	// 今の動かし方
+	ParticleUpdateMode updateMode_ = ParticleUpdateMode::kNone;
+
+	// 乱数生成器
+	std::mt19937 randomEngine_;
 
 	// 粒ごとのwvp・Worldを並べたStructuredBuffer
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_;

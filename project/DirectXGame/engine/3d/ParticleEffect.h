@@ -37,7 +37,7 @@ public:
 	/// </summary>
 	/// <param name="viewMatrix"></param>
 	/// <param name="projectionMatrix"></param>
-	void Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix);
+	void Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix, float deltaTime);
 
 	/// <summary>
 	/// 描画
