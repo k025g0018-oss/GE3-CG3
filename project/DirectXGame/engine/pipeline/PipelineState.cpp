@@ -48,8 +48,8 @@ void PipelineState::Initialize(
 
 	/// --- DepthStencilState ---
 
-	// 奥行きの比較と書き込み方法を設定
-	depthStencilState_.Initialize();
+	// 奥行きの比較と書き込み方法を設定 (Particle用は半透明で重なるため、Depthを書き込まない)
+	depthStencilState_.Initialize(!isInstancing);
 
 	/// --- GraphicsPipelineState ---
 

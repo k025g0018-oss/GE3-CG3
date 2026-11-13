@@ -543,6 +543,13 @@ void InstancingParticleEditorObject::DrawProperties() {
 
 	/// --- 見た目 ---
 
+	// 描画に使うBlendModeを選ぶ
+	const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
+	int blendModeIndex = static_cast<int>(particle_.GetBlendMode());
+	if (ImGui::Combo("Blend Mode", &blendModeIndex, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+		particle_.GetBlendMode() = static_cast<BlendMode>(blendModeIndex);
+	}
+
 	// 粒共通の色を変更する
 	ImGui::ColorEdit4("Particle Color", &particle_.GetColor().x);
 

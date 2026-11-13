@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BlendState.h"
 #include "DescriptorHeap.h"
 #include "Material.h"
 #include "Matrix4x4.h"
@@ -165,6 +166,14 @@ public:
 		return aliveCount_;
 	}
 
+	/// <summary>
+	/// Propertiesから描画に使うBlendModeを操作する
+	/// </summary>
+	/// <returns></returns>
+	BlendMode& GetBlendMode() {
+		return blendMode_;
+	}
+
 	///// ----- ===== ----- /////
 
 	///// ----- setter ----- /////
@@ -218,6 +227,9 @@ private:
 
 	// 今の動かし方
 	ParticleUpdateMode updateMode_ = ParticleUpdateMode::kNone;
+
+	// 描画に使うBlendMode (パーティクルは加算で調整することがほとんど)
+	BlendMode blendMode_ = BlendMode::kAdd;
 
 	// 乱数生成器
 	std::mt19937 randomEngine_;

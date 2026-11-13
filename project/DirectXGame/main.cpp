@@ -2056,9 +2056,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- Instancing Particle描画 ---
 
 			if (isInstancingParticleVisible) {
-				// Particle用のRootSignatureとPSOに切り替える (α値で徐々に消えるようにNormalでBlendする)
+				// 3Dオブジェクトを全て描画した後に、パーティクルを描画する
+				// Particle用のRootSignatureとPSOに切り替える (BlendModeはPropertiesで選択、初期値は加算)
 				commandList->SetGraphicsRootSignature(particlePipelineState.GetRootSignature());
-				commandList->SetPipelineState(particlePipelineState.GetPipelineState(BlendMode::kNormal));
+				commandList->SetPipelineState(particlePipelineState.GetPipelineState(instancingParticle.GetBlendMode()));
 
 				// ImGuiで選択したテクスチャを貼って描画する
 				instancingParticle.Draw(

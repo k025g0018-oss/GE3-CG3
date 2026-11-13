@@ -8,7 +8,8 @@ class DepthStencilState {
 public:
 	/// --- 初期化 ---
 	// 奥行きの比較と書き込み方法を設定
-	void Initialize();
+	// isDepthWriteEnabledがfalseなら、比較だけ行いDepthを書き込まない (Particle用)
+	void Initialize(bool isDepthWriteEnabled = true);
 
 	/// --- 取得 ---
 	// DepthStencilStateの設定を取得
