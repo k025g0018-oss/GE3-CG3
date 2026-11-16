@@ -12,7 +12,10 @@ const char* kTextureModes[] = {
 	"2 : Genbaneko",
 	"3 : Monster Ball",
 	"4 : Checker Board",
-	"5 : Fence"
+	"5 : Fence",
+	"6 : Noise",
+	"7 : Powapowa",
+	"8 : Star"
 };
 }
 
@@ -243,6 +246,7 @@ void SceneSettingsEditorObject::DrawProperties() {
 }
 
 ///// ----- Sphere ----- /////
+
 SphereEditorObject::SphereEditorObject(
 	Sphere& sphere,
 	int& textureMode,
@@ -336,7 +340,10 @@ void SphereEditorObject::DrawProperties() {
 	}
 }
 
+///// ----- ===== ----- /////
+
 ///// ----- OBJ Model ----- /////
+
 ModelEditorObject::ModelEditorObject(
 	Model& model,
 	const char* name,
@@ -477,6 +484,339 @@ void ModelEditorObject::DrawProperties() {
 		}
 
 		ImGui::PopID();
+	}
+}
+
+///// ----- ===== ----- /////
+
+///// ----- InstancingParticle ----- /////
+
+InstancingParticleEditorObject::InstancingParticleEditorObject(
+	InstancingParticle& particle,
+	const char* name,
+	int& textureMode,
+	bool& isVisible)
+	: particle_(particle),
+	name_(name),
+	textureMode_(textureMode),
+	initialTransform_(particle.GetTransform()),
+	isVisible_(isVisible) {
+}
+
+void InstancingParticleEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Instancing Particle Control");
+
+	// 描画をON/OFFする
+	ImGui::Checkbox("Draw Particle", &isVisible_);
+
+	/// --- 描画数 ---
+
+	// 1～最大数の範囲で描画数を変更する
+	const uint32_t minCount = 1;
+	const uint32_t maxCount = particle_.GetMaxInstanceCount();
+	ImGui::SliderScalar(
+		"Instance Count",
+		ImGuiDataType_U32,
+		&particle_.GetInstanceCount(),
+		&minCount,
+		&maxCount
+	);
+
+	// 生きている (描画している) 粒の数を表示する
+	ImGui::Text("Alive Count : %u", particle_.GetAliveCount());
+
+	/// --- Update ---
+
+	// 動かし方を選ぶ (NormalとRandomは同時にオンにならない、外すと最初の並びに戻る)
+	ImGui::SeparatorText("Update");
+
+	const ParticleUpdateMode updateMode = particle_.GetUpdateMode();
+
+	// 真上に動かす
+	bool isNormal = (updateMode == ParticleUpdateMode::kNormal);
+	if (ImGui::Checkbox("Normal", &isNormal)) {
+		particle_.SetUpdateMode(isNormal ? ParticleUpdateMode::kNormal : ParticleUpdateMode::kNone);
+	}
+
+	// ランダムに動かす
+	bool isRandom = (updateMode == ParticleUpdateMode::kRandom);
+	if (ImGui::Checkbox("Random", &isRandom)) {
+		particle_.SetUpdateMode(isRandom ? ParticleUpdateMode::kRandom : ParticleUpdateMode::kNone);
+	}
+
+	// 寿命が尽きた粒を再発生させる (Randomのときだけ操作できる)
+	ImGui::BeginDisabled(!isRandom);
+	ImGui::Checkbox("Respawn", &particle_.GetIsRespawn());
+	ImGui::EndDisabled();
+
+	/// --- Dissolve ---
+
+	// αTestの閾値を変えて、テクスチャのα値が低い部分から抜けるようにする (Noiseテクスチャで分かりやすい)
+	ImGui::SeparatorText("Dissolve");
+	ImGui::SliderFloat("Dissolve Threshold", &particle_.GetDissolveThreshold(), 0.0f, 1.0f);
+
+	// 寿命に合わせて閾値を上げていく (Randomのときだけ操作できる)
+	ImGui::BeginDisabled(!isRandom);
+	ImGui::Checkbox("Dissolve Over Life", &particle_.GetIsDissolveOverLife());
+	ImGui::EndDisabled();
+
+	/// --- 見た目 ---
+
+	// 描画に使うBlendModeを選ぶ
+	const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
+	int blendModeIndex = static_cast<int>(particle_.GetBlendMode());
+	if (ImGui::Combo("Blend Mode", &blendModeIndex, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+		particle_.GetBlendMode() = static_cast<BlendMode>(blendModeIndex);
+	}
+
+	// 粒共通の色を変更する
+	ImGui::ColorEdit4("Particle Color", &particle_.GetColor().x);
+
+	// 粒へ貼るTextureを選択する
+	ImGui::Combo(
+		"Texture Mode",
+		&textureMode_,
+		kTextureModes,
+		IM_ARRAYSIZE(kTextureModes)
+	);
+
+	ImGui::Separator();
+
+	/// --- Transform ---
+
+	// 全体の拡縮・回転・移動を変更する
+	Transform& transform = particle_.GetTransform();
+
+	ImGui::DragFloat3("Scale", &transform.scale.x, 0.01f);
+	ImGui::DragFloat3("Rotate", &transform.rotate.x, 0.01f);
+	ImGui::DragFloat3("Translate", &transform.translate.x, 0.01f);
+
+	if (ImGui::Button("Reset SRT")) {
+		transform = initialTransform_;
+	}
+}
+
+///// ----- ===== ----- /////
+
+///// ----- ParticleEffect ----- /////
+
+ParticleEffectEditorObject::ParticleEffectEditorObject(
+	ParticleEffect& effect,
+	const char* name,
+	bool& isVisible)
+	: effect_(effect),
+	name_(name),
+	isVisible_(isVisible) {
+}
+
+void ParticleEffectEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Particle Effect Control");
+
+	// 描画をON/OFFする
+	ImGui::Checkbox("Draw Effect", &isVisible_);
+
+	// 全てのグループの位置・向き・色を再抽選する
+	if (ImGui::Button("Randomize All")) {
+		for (std::unique_ptr<ParticleGroup>& group : effect_.GetGroups()) {
+			group->Randomize();
+		}
+	}
+
+	const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
+
+	/// --- グループごと ---
+
+	for (std::unique_ptr<ParticleGroup>& group : effect_.GetGroups()) {
+		// グループ名ごとに折りたためるようにする
+		if (!ImGui::TreeNode(group->GetName().c_str())) {
+			continue;
+		}
+
+		InstancingParticle& particle = group->GetInstancingParticle();
+
+		// このグループの位置・向き・色を再抽選する
+		if (ImGui::Button("Randomize")) {
+			group->Randomize();
+		}
+
+		// 1～最大数の範囲で使う粒の数を変更する
+		const uint32_t minCount = 1;
+		const uint32_t maxCount = particle.GetMaxInstanceCount();
+		ImGui::SliderScalar(
+			"Instance Count",
+			ImGuiDataType_U32,
+			&particle.GetInstanceCount(),
+			&minCount,
+			&maxCount
+		);
+
+		// 生きている (描画している) 粒の数を表示する
+		ImGui::Text("Alive Count : %u", particle.GetAliveCount());
+
+		// 描画に使うBlendModeを選ぶ
+		int blendModeIndex = static_cast<int>(group->GetBlendMode());
+		if (ImGui::Combo("Blend Mode", &blendModeIndex, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+			group->GetBlendMode() = static_cast<BlendMode>(blendModeIndex);
+		}
+
+		// グループ全体の色を変更する
+		ImGui::ColorEdit4("Color", &particle.GetColor().x);
+
+		// グループ全体の位置を動かす
+		ImGui::DragFloat3("Translate", &particle.GetTransform().translate.x, 0.01f);
+
+		ImGui::TreePop();
+	}
+}
+
+///// ----- ===== ----- /////
+
+///// ----- MouseParticleEffect ----- /////
+
+MouseParticleEffectEditorObject::MouseParticleEffectEditorObject(
+	MouseParticleEffect& effect,
+	const char* name,
+	bool& isVisible)
+	: effect_(effect),
+	name_(name),
+	isVisible_(isVisible) {
+}
+
+void MouseParticleEffectEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Mouse Particle Effect Control");
+
+	// 描画をON/OFFする
+	ImGui::Checkbox("Draw Effect", &isVisible_);
+
+	/// --- カーソルの輪 ---
+
+	ImGui::SeparatorText("Cursor");
+
+	// カーソルの位置に輪を表示するか
+	ImGui::Checkbox("Show Cursor", &effect_.GetIsCursorVisible());
+
+	// 輪の色と大きさ
+	InstancingParticle& cursor = effect_.GetCursor();
+	ImGui::ColorEdit4("Cursor Color", &cursor.GetColor().x);
+	ImGui::DragFloat("Cursor Size", &cursor.GetTransform().scale.x, 0.005f, 0.01f, 1.0f);
+	// 縦横同じ大きさにする
+	cursor.GetTransform().scale.y = cursor.GetTransform().scale.x;
+
+	/// --- 飛び散る立方体 ---
+
+	ImGui::SeparatorText("Burst Cube (Click)");
+
+	ParticleGroup& burstGroup = effect_.GetBurstGroup();
+	ParticleGroupSettings& burstSettings = burstGroup.GetSettings();
+
+	// 1回のクリックで出す数
+	const uint32_t minBurstCount = 1;
+	const uint32_t maxBurstCount = 50;
+	ImGui::SliderScalar("Burst Count", ImGuiDataType_U32, &effect_.GetBurstCount(), &minBurstCount, &maxBurstCount);
+
+	// 生きている (描画している) 粒の数を表示する
+	ImGui::Text("Alive Count : %u", burstGroup.GetInstancingParticle().GetAliveCount());
+
+	// 打ち上げる速さ、重力、色の変わる速さ
+	ImGui::DragFloatRange2("Speed", &burstSettings.speedMin, &burstSettings.speedMax, 0.05f, 0.0f, 20.0f);
+	ImGui::DragFloat("Gravity", &burstSettings.acceleration.y, 0.05f, -30.0f, 0.0f);
+	ImGui::DragFloat("Hue Shift Speed", &burstSettings.hueShiftSpeed, 0.01f, 0.0f, 5.0f);
+
+	/// --- カーソルから出る円 ---
+
+	ImGui::SeparatorText("Mouse Trail Circle");
+
+	ParticleGroup& trailGroup = effect_.GetTrailGroup();
+
+	// 円を出す間隔 (秒)
+	ImGui::SliderFloat("Emit Interval", &effect_.GetTrailEmitInterval(), 0.01f, 0.5f, "%.3f s");
+
+	// 生きている (描画している) 粒の数を表示する
+	ImGui::Text("Alive Count : %u", trailGroup.GetInstancingParticle().GetAliveCount());
+
+	// 円の色
+	ImGui::ColorEdit4("Trail Color", &trailGroup.GetSettings().tintColor.x);
+
+	/// --- リセット ---
+
+	// 出ている粒を全て消す
+	if (ImGui::Button("Clear")) {
+		burstGroup.Randomize();
+		trailGroup.Randomize();
+	}
+}
+
+///// ----- ===== ----- /////
+
+///// ----- CameraShake ----- /////
+
+CameraShakeEditorObject::CameraShakeEditorObject(
+	CameraShake& cameraShake,
+	const char* name)
+	: cameraShake_(cameraShake),
+	name_(name) {
+}
+
+void CameraShakeEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Camera Shake Control");
+
+	// クリックで揺らすかどうか
+	ImGui::Checkbox("Enable", &cameraShake_.GetIsEnabled());
+
+	// 揺れる時間 (秒) と強さ (m)
+	ImGui::SliderFloat("Duration", &cameraShake_.GetDuration(), 0.01f, 1.0f, "%.2f s");
+	ImGui::SliderFloat("Amplitude", &cameraShake_.GetAmplitude(), 0.0f, 0.5f, "%.3f m");
+
+	// クリックしなくても試せるようにする
+	if (ImGui::Button("Test Shake")) {
+		cameraShake_.Start();
+	}
+
+	ImGui::SameLine();
+	ImGui::TextUnformatted(cameraShake_.IsShaking() ? "Shaking" : "Idle");
+}
+
+///// ----- ===== ----- /////
+
+///// ----- TuningFile ----- /////
+
+TuningFileEditorObject::TuningFileEditorObject(
+	TuningFile& tuningFile,
+	const char* name,
+	const std::string& filePath,
+	bool& isAutoReload)
+	: tuningFile_(tuningFile),
+	name_(name),
+	filePath_(filePath),
+	isAutoReload_(isAutoReload) {
+}
+
+void TuningFileEditorObject::DrawProperties() {
+	ImGui::TextUnformatted("Particle Tuning (CSV)");
+	ImGui::TextDisabled("%s", filePath_.c_str());
+
+	/// --- 保存・読み込み ---
+
+	// 今の値をcsvへ書き出す
+	if (ImGui::Button("Save")) {
+		message_ = tuningFile_.Save(filePath_) ? "Saved" : "Save Failed";
+	}
+
+	ImGui::SameLine();
+
+	// csvの値を読み込み直す
+	if (ImGui::Button("Reload")) {
+		message_ = tuningFile_.Load(filePath_) ? "Reloaded" : "File Not Found";
+	}
+
+	/// --- ホットリロード ---
+
+	// csvが書き換えられたら自動で読み込み直す
+	ImGui::Checkbox("Hot Reload", &isAutoReload_);
+
+	// 最後の操作の結果
+	if (!message_.empty()) {
+		ImGui::Text("Result : %s", message_.c_str());
 	}
 }
 

@@ -184,10 +184,33 @@
     <ClCompile Include="DirectXGame\main.cpp">
       <Filter>DirectXGame</Filter>
     </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\PrimitiveMesh.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\InstancingParticle.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\ParticleEffect.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\ParticleGroup.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\MouseParticleEffect.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\3d\CameraShake.cpp">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectXGame\engine\io\TuningFile.cpp">
+      <Filter>DirectXGame\engine\io</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\shaders\Object3d.VS.hlsl" />
     <FxCompile Include="resources\shaders\Object3d.PS.hlsl" />
+    <FxCompile Include="resources\shaders\Particle.VS.hlsl" />
+    <FxCompile Include="resources\shaders\Particle.PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="externals\imgui\imconfig.h">
@@ -340,6 +363,27 @@
     <ClInclude Include="DirectXGame\engine\editor\EditorObject.h">
       <Filter>DirectXGame\engine\editor</Filter>
     </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\PrimitiveMesh.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\InstancingParticle.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\ParticleEffect.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\ParticleGroup.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\MouseParticleEffect.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\3d\CameraShake.h">
+      <Filter>DirectXGame\engine\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXGame\engine\io\TuningFile.h">
+      <Filter>DirectXGame\engine\io</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Memo.txt" />
@@ -349,5 +393,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\shaders\Object3d.hlsli" />
+    <None Include="resources\shaders\Particle.hlsli" />
   </ItemGroup>
 </Project>

@@ -7,6 +7,13 @@
 #include "Sprite.h"
 #include "Sphere.h"
 #include "Model.h"
+#include "InstancingParticle.h"
+#include "ParticleEffect.h"
+#include "MouseParticleEffect.h"
+#include "CameraShake.h"
+#include "TuningFile.h"
+
+#include <string>
 
 // ゲームオブジェクトをImGuiのHierarchyとPropertiesへ接続する共通ラッパー
 class IEditorObject {
@@ -145,6 +152,146 @@ public:
 
 private:
 	Primitive3D& object_;
+};
+
+// InstancingParticleをHierarchyとPropertiesへ接続するラッパークラス
+class InstancingParticleEditorObject final : public IEditorObject {
+public:
+	InstancingParticleEditorObject(
+		InstancingParticle& particle,
+		const char* name,
+		int& textureMode,
+		bool& isVisible
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 描画本体は所有せず、mainで作成したInstancingParticleを参照する
+	InstancingParticle& particle_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
+
+	// Texture選択番号をmainと共有する
+	int& textureMode_;
+
+	// Editorへ接続した時点のSRTをリセット先として保存する
+	Transform initialTransform_{};
+
+	// 描画するかどうかをmainと共有する
+	bool& isVisible_;
+};
+
+// ParticleEffectをHierarchyとPropertiesへ接続するラッパークラス
+class ParticleEffectEditorObject final : public IEditorObject {
+public:
+	ParticleEffectEditorObject(
+		ParticleEffect& effect,
+		const char* name,
+		bool& isVisible
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 描画本体は所有せず、mainで作成したParticleEffectを参照する
+	ParticleEffect& effect_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
+
+	// 描画するかどうかをmainと共有する
+	bool& isVisible_;
+};
+
+// MouseParticleEffectをHierarchyとPropertiesへ接続するラッパークラス
+class MouseParticleEffectEditorObject final : public IEditorObject {
+public:
+	MouseParticleEffectEditorObject(
+		MouseParticleEffect& effect,
+		const char* name,
+		bool& isVisible
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 描画本体は所有せず、mainで作成したMouseParticleEffectを参照する
+	MouseParticleEffect& effect_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
+
+	// 描画するかどうかをmainと共有する
+	bool& isVisible_;
+};
+
+// CameraShakeをHierarchyとPropertiesへ接続するラッパークラス
+class CameraShakeEditorObject final : public IEditorObject {
+public:
+	CameraShakeEditorObject(
+		CameraShake& cameraShake,
+		const char* name
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 本体は所有せず、mainで作成したCameraShakeを参照する
+	CameraShake& cameraShake_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
+};
+
+// TuningFile (調整値の保存・読み込み) をHierarchyとPropertiesへ接続するラッパークラス
+class TuningFileEditorObject final : public IEditorObject {
+public:
+	TuningFileEditorObject(
+		TuningFile& tuningFile,
+		const char* name,
+		const std::string& filePath,
+		bool& isAutoReload
+	);
+
+	const char* GetName() const override {
+		return name_;
+	}
+
+	void DrawProperties() override;
+
+private:
+	// 本体は所有せず、mainで作成したTuningFileを参照する
+	TuningFile& tuningFile_;
+
+	// Hierarchyへ表示する名前
+	const char* name_;
+
+	// 保存・読み込みするファイル
+	std::string filePath_;
+
+	// ホットリロードするかどうかをmainと共有する
+	bool& isAutoReload_;
+
+	// 最後に行った操作の結果
+	std::string message_;
 };
 
 #endif // USE_IMGUI

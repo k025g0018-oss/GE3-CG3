@@ -1,0 +1,363 @@
+#include "InstancingParticle.h"
+#include "BufferResource.h"
+
+#include <algorithm>
+#include <cassert>
+#include <numbers>
+
+/// <summary>
+/// 解放処理
+/// </summary>
+InstancingParticle::~InstancingParticle() {
+	Finalize();
+}
+
+/// <summary>
+/// 初期化
+/// </summary>
+/// <param name="device"></param>
+/// <param name="srvDescriptorHeap"></param>
+/// <param name="srvIndex"></param>
+/// <param name="vertices"></param>
+/// <param name="maxInstanceCount"></param>
+void InstancingParticle::Initialize(
+	ID3D12Device* device,
+	const DescriptorHeap& srvDescriptorHeap,
+	uint32_t srvIndex,
+	const std::vector<VertexData>& vertices,
+	uint32_t maxInstanceCount) {
+
+	assert(device != nullptr);
+	assert(!vertices.empty());
+	assert(maxInstanceCount > 0);
+
+	/// --- 数 ---
+
+	// 最大数描画 最初
+	maxInstanceCount_ = maxInstanceCount;
+	instanceCount_ = maxInstanceCount;
+
+	/// --- 頂点 ---
+
+	// 受け取った形状を頂点バッファへ書き込む
+	vertices_ = vertices;
+	vertexBuffer_.Initialize(device, static_cast<uint32_t>(vertices_.size()));
+
+	VertexData* vertexData = vertexBuffer_.GetData();
+	for (size_t i = 0; i < vertices_.size(); ++i) {
+		vertexData[i] = vertices_[i];
+	}
+
+	/// --- マテリアル ---
+
+	materialResource_ = BufferResource::Create(device, sizeof(Material));
+	HRESULT hr = materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+	assert(SUCCEEDED(hr));
+
+	// 白色、ライティングなし、uv変化なし
+	materialData_->color = {1.0f, 1.0f, 1.0f, 1.0f};
+	materialData_->enableLighting = false;
+	materialData_->lightingMode = 0;
+	materialData_->uvTransform = Matrix4x4::MakeIdentity4x4();
+
+	/// --- Instancing用のResource ---
+
+	// 粒の最大数分のParticleForGPUを格納できるResourceを作る
+	instancingResource_ = BufferResource::Create(device, sizeof(ParticleForGPU) * maxInstanceCount_);
+	// 書き込むためのアドレスを取得
+	hr = instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instancingData_));
+	assert(SUCCEEDED(hr));
+
+	// 単位行列と白色を書き込んでおく
+	for (uint32_t index = 0; index < maxInstanceCount_; ++index) {
+		instancingData_[index].WVP = Matrix4x4::MakeIdentity4x4();
+		instancingData_[index].World = Matrix4x4::MakeIdentity4x4();
+		instancingData_[index].color = {1.0f, 1.0f, 1.0f, 1.0f};
+		instancingData_[index].dissolveThreshold = 0.0f;
+	}
+
+	/// --- Instancing用のSRV ---
+
+	// StructuredBufferとしてシェーダーから読めるようにする
+	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN; // 構造体なのでフォーマットは不明
+	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER; // Textureではなく、Bufferとして利用する
+	instancingSrvDesc.Buffer.FirstElement = 0;
+	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instancingSrvDesc.Buffer.NumElements = maxInstanceCount_; // アクセスする要素数
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleForGPU); // 1要素のサイズ (Strideが変わったのでParticleForGPUにする)
+
+	// ヒープの指定された番号にInstancing用のSRVを作成する
+	const D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = srvDescriptorHeap.GetCPUHandle(srvIndex);
+	instancingSrvHandleGPU_ = srvDescriptorHeap.GetGPUHandle(srvIndex);
+	device->CreateShaderResourceView(instancingResource_.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+
+	/// --- 粒ごとのTransformと速度 ---
+
+	// 乱数生成器をランダムなシードで初期化する
+	std::random_device seedGenerator;
+	randomEngine_.seed(seedGenerator());
+
+	// 最初の並びに設定する
+	particles_.resize(maxInstanceCount_);
+	ResetParticles();
+
+	// 片面の板の表側が初期状態でカメラに向くようにする
+	transform_.rotate.y = std::numbers::pi_v<float>;
+}
+
+/// <summary>
+/// 更新
+/// </summary>
+/// <param name="viewMatrix"></param>
+/// <param name="projectionMatrix"></param>
+/// <param name="deltaTime"></param>
+void InstancingParticle::Update(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix, float deltaTime) {
+
+	// 動かし方に合わせて粒を動かす
+	SimulateParticles(deltaTime);
+
+	// 生きている粒をGPUへ送る
+	TransferToGPU(viewMatrix, projectionMatrix);
+}
+
+/// <summary>
+/// 動かし方に合わせて、粒の位置と経過時間を進める
+/// </summary>
+/// <param name="deltaTime"></param>
+void InstancingParticle::SimulateParticles(float deltaTime) {
+
+	for (uint32_t index = 0; index < instanceCount_; ++index) {
+		// 生存期間を過ぎていたら
+		if (particles_[index].lifeTime <= particles_[index].currentTime) {
+			if (isRespawn_ && updateMode_ == ParticleUpdateMode::kRandom) {
+				// 再発生がONなら、生成関数で新しい粒として生まれ直す
+				particles_[index] = MakeNewParticle(randomEngine_);
+			} else {
+				// 再発生しないなら、更新しない
+				continue;
+			}
+		}
+
+		// 動かす設定のときだけ、位置と経過時間を進める
+		if (updateMode_ != ParticleUpdateMode::kNone) {
+			// 速度(m/s) × 経過時間(s) で位置を進める
+			particles_[index].transform.translate =
+				particles_[index].transform.translate + particles_[index].velocity * deltaTime;
+			// 経過時間を足す
+			particles_[index].currentTime += deltaTime;
+		}
+	}
+}
+
+/// <summary>
+/// 生きている粒だけをStructuredBufferへ書き込む
+/// </summary>
+/// <param name="viewMatrix"></param>
+/// <param name="projectionMatrix"></param>
+void InstancingParticle::TransferToGPU(const Matrix4x4& viewMatrix, const Matrix4x4& projectionMatrix) {
+
+	// 描画数が確保したResourceの数を超えないようにする
+	assert(instanceCount_ <= maxInstanceCount_);
+
+	/// --- 共通の行列 ---
+
+	// 親のTransformからWorld行列を作る (全体をまとめて動かす)
+	const Matrix4x4 parentWorldMatrix = Matrix4x4::MakeAffineMatrix(
+		transform_.scale,
+		transform_.rotate,
+		transform_.translate
+	);
+
+	// View, Projectionは全粒共通なので先にかけておく
+	const Matrix4x4 viewProjectionMatrix = Matrix4x4::Multiply(viewMatrix, projectionMatrix);
+
+	/// --- 描画数の決定 ---
+
+	// 描画すべきインスタンス数を数え直す
+	aliveCount_ = 0;
+
+	for (uint32_t index = 0; index < instanceCount_; ++index) {
+		// 生存期間を過ぎていたら、描画対象にしない
+		if (particles_[index].lifeTime <= particles_[index].currentTime) {
+			continue;
+		}
+
+		// 粒自身のTransformから行列を作る
+		const Matrix4x4 localMatrix = Matrix4x4::MakeAffineMatrix(
+			particles_[index].transform.scale,
+			particles_[index].transform.rotate,
+			particles_[index].transform.translate
+		);
+
+		// 粒 -> 親 の順にかけてWorld行列を作る
+		const Matrix4x4 worldMatrix = Matrix4x4::Multiply(localMatrix, parentWorldMatrix);
+
+		// 生きている粒だけを前から詰めて、StructuredBufferへ書き込む
+		instancingData_[aliveCount_].WVP = Matrix4x4::Multiply(worldMatrix, viewProjectionMatrix);
+		instancingData_[aliveCount_].World = worldMatrix;
+
+		// 色はそのままコピーする
+		instancingData_[aliveCount_].color = particles_[index].color;
+
+		// 寿命に対して、どれだけ時間が経ったか (0.0～1.0)
+		const float lifeRatio = particles_[index].currentTime / particles_[index].lifeTime;
+
+		/// --- Dissolve ---
+
+		// Propertiesで設定した閾値を使う
+		float dissolveThreshold = dissolveThreshold_;
+		const bool isDissolveOverLife = isDissolveOverLife_ && updateMode_ == ParticleUpdateMode::kRandom;
+		if (isDissolveOverLife) {
+			// 寿命に合わせて閾値を上げ、抜ける部分を増やしていく (Windowsのmaxマクロと衝突しないように()で囲む)
+			dissolveThreshold = (std::max)(dissolveThreshold, lifeRatio);
+		}
+		instancingData_[aliveCount_].dissolveThreshold = dissolveThreshold;
+
+		/// --- α値 ---
+
+		// 発生直後は0.0から1.0へ近づけ、ふわっと現れるようにする
+		float fadeIn = 1.0f;
+		if (fadeInRatio_ > 0.0f) {
+			fadeIn = (std::min)(1.0f, lifeRatio / fadeInRatio_);
+		}
+
+		// 経過時間に合わせてα値を1.0から0.0へ近づけ、徐々に消えていくようにする
+		// 寿命でDissolveするときは、抜け方が見えるようにα値は1.0のままにする
+		const float alpha = isDissolveOverLife ? 1.0f : (1.0f - lifeRatio) * fadeIn;
+		// 算出したα値をGPUに送る
+		instancingData_[aliveCount_].color.w = alpha;
+
+		// 生きているParticleの数を1つカウントする
+		++aliveCount_;
+	}
+}
+
+/// <summary>
+/// 描画
+/// </summary>
+/// <param name="commandList"></param>
+/// <param name="texterHandle"></param>
+void InstancingParticle::Draw(ID3D12GraphicsCommandList* commandList, D3D12_GPU_DESCRIPTOR_HANDLE texterHandle) const {
+
+	assert(commandList != nullptr);
+
+	// 生きている粒がなければ何もしない
+	if (aliveCount_ == 0) {
+		return;
+	}
+
+	// 確保したResourceの数を超えないようにする
+	assert(aliveCount_ <= maxInstanceCount_);
+
+	// 形状の頂点バッファを設定する
+	const D3D12_VERTEX_BUFFER_VIEW& vertexBufferView = vertexBuffer_.GetView();
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// マテリアルを設定する
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
+	// Instancing用のDataを読むために、StructuredBufferのSRVを設定する
+	commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU_);
+	// テクスチャを設定する
+	commandList->SetGraphicsRootDescriptorTable(2, texterHandle);
+
+	// 板ポリゴンを、生きている粒の数だけInstance描画する
+	commandList->DrawInstanced(static_cast<UINT>(vertices_.size()), aliveCount_, 0, 0);
+}
+
+/// <summary>
+/// 終了
+/// </summary>
+void InstancingParticle::Finalize() {
+
+	vertexBuffer_.Finalize();
+	materialData_ = nullptr;
+	instancingData_ = nullptr;
+}
+
+/// <summary>
+/// 動かし方を切り替える
+/// </summary>
+/// <param name="updateMode"></param>
+void InstancingParticle::SetUpdateMode(ParticleUpdateMode updateMode) {
+
+	updateMode_ = updateMode;
+
+	if (updateMode_ == ParticleUpdateMode::kRandom) {
+		// 生成関数を使って、全ての粒をランダムに作り直す
+		for (uint32_t index = 0; index < maxInstanceCount_; ++index) {
+			particles_[index] = MakeNewParticle(randomEngine_);
+		}
+	} else {
+		// それ以外は最初の並びに戻す
+		ResetParticles();
+	}
+}
+
+/// <summary>
+/// 粒を最初の並びに戻す
+/// </summary>
+void InstancingParticle::ResetParticles() {
+
+	for (uint32_t index = 0; index < maxInstanceCount_; ++index) {
+		// それぞれ位置が少しずつずれるように並べる
+		particles_[index].transform.scale = {1.0f, 1.0f, 1.0f};
+		particles_[index].transform.rotate = {0.0f, 0.0f, 0.0f};
+		particles_[index].transform.translate = {index * 0.1f, index * 0.1f, index * 0.1f};
+
+		// 速度を上向きに設定 (1m/s)
+		particles_[index].velocity = {0.0f, 1.0f, 0.0f};
+
+		// 色は白にする
+		particles_[index].color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+		// 消えないように、生存可能な時間を最大にしておく
+		particles_[index].lifeTime = (std::numeric_limits<float>::max)(); // Windowsのmaxマクロと衝突しないように()で囲む
+		particles_[index].currentTime = 0.0f;
+	}
+}
+
+/// <summary>
+/// 位置と速度がランダムな粒を1つ生成する
+/// </summary>
+/// <param name="randomEngine"></param>
+/// <returns></returns>
+Particle InstancingParticle::MakeNewParticle(std::mt19937& randomEngine) {
+
+	// -1.0～1.0の範囲に収まる一様な乱数を作る分布生成器
+	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
+	Particle particle{};
+	particle.transform.scale = {1.0f, 1.0f, 1.0f};
+	particle.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+	// 位置と速度を[-1,1]でランダムに初期化 (位置はm、速度はm/s)
+	particle.transform.translate = {
+		distribution(randomEngine),
+		distribution(randomEngine),
+		distribution(randomEngine)
+	};
+	particle.velocity = {
+		distribution(randomEngine),
+		distribution(randomEngine),
+		distribution(randomEngine)
+	};
+
+	// 0.0～1.0の範囲でRGBをランダムに決める (αは1.0)
+	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
+	particle.color = {
+		distColor(randomEngine),
+		distColor(randomEngine),
+		distColor(randomEngine),
+		1.0f
+	};
+
+	// 1秒～3秒の間でランダムに生存させる
+	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
+	particle.lifeTime = distTime(randomEngine);
+	particle.currentTime = 0.0f;
+
+	return particle;
+}

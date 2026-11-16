@@ -26,6 +26,12 @@
 #include "Window.h"
 #include "GraphicsDevice.h"
 #include "D3DResourceLeakChecker.h"
+#include "InstancingParticle.h"
+#include "ParticleEffect.h"
+#include "MouseParticleEffect.h"
+#include "CameraShake.h"
+#include "TuningFile.h"
+#include "PrimitiveMesh.h"
 
 #include <cstdint> // int32_t
 #include <string> // 文字列
@@ -148,9 +154,13 @@ void DrawHierarchy(const std::vector<IEditorObject*>& editorObjects, IEditorObje
 }
 
 // Scene用レンダーテクスチャをパネル内へ表示する カメラ操作
+// isImageHovered : ゲーム画面の画像の上にマウスがあるか
+// mouseRatio     : 画像の中でのマウスの位置 (左上が(0,0)、右下が(1,1))
 bool DrawScene(
 	D3D12_GPU_DESCRIPTOR_HANDLE sceneSrvHandle,
-	const IEditorObject* selectedObject
+	const IEditorObject* selectedObject,
+	bool& isImageHovered,
+	Vector2& mouseRatio
 ) {
 	ImGui::Begin("Scene");
 
@@ -177,6 +187,19 @@ bool DrawScene(
 			sceneTexture,
 			panelSize
 		);
+
+		// 画像の上にマウスがあるかを調べる
+		isImageHovered = ImGui::IsItemHovered();
+
+		// 画像の左上と右下の位置から、画像の中でのマウスの位置 (0.0～1.0) を求める
+		// 例: 画像の真ん中なら (0.5, 0.5)
+		const ImVec2 imageMin = ImGui::GetItemRectMin();
+		const ImVec2 imageMax = ImGui::GetItemRectMax();
+		const ImVec2 mousePosition = ImGui::GetIO().MousePos;
+		mouseRatio = {
+			(mousePosition.x - imageMin.x) / (imageMax.x - imageMin.x),
+			(mousePosition.y - imageMin.y) / (imageMax.y - imageMin.y)
+		};
 	}
 
 	// Sceneウィンドウ上だけカメラ操作を有効にする
@@ -394,6 +417,8 @@ void DrawStatistics(
 	bool& isTeapotVisible,
 	bool& isSuzanneVisible,
 	bool& isFenceVisible,
+	bool& isInstancingParticleVisible,
+	bool& isParticleEffectVisible,
 	bool& isSpriteVisible
 ) {
 
@@ -448,6 +473,8 @@ void DrawStatistics(
 		isTeapotVisible = true;
 		isSuzanneVisible = true;
 		isFenceVisible = true;
+		isInstancingParticleVisible = true;
+		isParticleEffectVisible = true;
 		isSpriteVisible = true;
 	}
 
@@ -467,6 +494,8 @@ void DrawStatistics(
 		isTeapotVisible = false;
 		isSuzanneVisible = false;
 		isFenceVisible = false;
+		isInstancingParticleVisible = false;
+		isParticleEffectVisible = false;
 		isSpriteVisible = false;
 	}
 
@@ -843,6 +872,34 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		PipelineState pipelineState;
 		pipelineState.Initialize(device, graphicsDevice->GetDxcCompiler(), logStream);
 
+		/// --- Particle用PSO ---
+
+		// Particle用のShaderとRootSignatureで、全てのBlendMode分のPSOを作成する
+		// RootSignatureはObject3d用とParticle用で別々に作って管理する
+		// 半透明の粒同士で隠し合わないように、Depthは書き込まない
+		PipelineState particlePipelineState;
+		particlePipelineState.Initialize(
+			device,
+			graphicsDevice->GetDxcCompiler(),
+			logStream,
+			L"resources/shaders/Particle.VS.hlsl",
+			L"resources/shaders/Particle.PS.hlsl",
+			true,
+			false);
+
+		/// --- 不透明な立体のParticle用PSO ---
+
+		// 三角錐・立方体のような不透明な立体は、前後関係が正しくなるようにDepthを書き込む
+		PipelineState solidParticlePipelineState;
+		solidParticlePipelineState.Initialize(
+			device,
+			graphicsDevice->GetDxcCompiler(),
+			logStream,
+			L"resources/shaders/Particle.VS.hlsl",
+			L"resources/shaders/Particle.PS.hlsl",
+			true,
+			true);
+
 		/// --- BlendMode ---
 
 		// 今使うBlendMode (ImGuiで切り替える)
@@ -885,6 +942,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		///// ----- Sprite ----- /////
 
 		///// ----- 初期化 ----- /////
+
 		/// --- Sprite専用のVertexBuffer、Material、WVPを作成 ---
 		// 2D専用オブジェクトであることが分かる名前に統一する
 		Sprite2D sprite2D;
@@ -1264,6 +1322,131 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- ===== ----- /////
 
+		///// ----- Instancing Particle ----- /////
+
+		/// --- 初期化 ---
+		// 板パーティクルの最大数
+		constexpr uint32_t kPlaneParticleMaxCount = 10;
+
+		// Instancing用SRVの番号 (0:ImGui、1～kTextureCount:Texture、その次:Scene画面 の次の空いている番号)
+		constexpr uint32_t kInstancingParticleSrvIndex = 1 + TextureManager::kTextureCount + 1;
+
+		// 板をDrawInstancedでまとめて描画する
+		InstancingParticle instancingParticle;
+		instancingParticle.Initialize(
+			device,
+			srvDescriptorHeap,
+			kInstancingParticleSrvIndex,
+			PrimitiveMesh::CreateQuad(),
+			kPlaneParticleMaxCount);
+
+		// 表示の切り替え
+		bool isInstancingParticleVisible = true;
+
+		// 貼るテクスチャの番号 (最初uvChecker)
+		int instancingParticleTextureMode = 1;
+
+		///// ----- ===== ----- /////
+
+		///// ----- Particle Effect ----- /////
+
+		/// --- 初期化 ---
+		// Instancing用SRVは、Instancing Particleの次の番号からグループの数だけ使う
+		constexpr uint32_t kParticleEffectSrvStartIndex = kInstancingParticleSrvIndex + 1;
+
+		// ぽわぽわ・星・三角錐・立方体を画面全体にちりばめるパーティクルエフェクト
+		ParticleEffect particleEffect;
+		particleEffect.Initialize(
+			device,
+			srvDescriptorHeap,
+			kParticleEffectSrvStartIndex,
+			textureManager);
+
+		// 表示の切り替え
+		bool isParticleEffectVisible = true;
+
+		///// ----- ===== ----- /////
+
+		///// ----- 背景 ----- /////
+
+		/// --- 初期化 ---
+		// Instancing用SRVは、Particle Effectが予約した番号の次を使う
+		constexpr uint32_t kBackgroundSrvIndex = kParticleEffectSrvStartIndex + ParticleEffect::kMaxGroupCount;
+
+		// ノイズ画像を貼った大きな板を1枚だけ、一番奥に描画する
+		InstancingParticle background;
+		background.Initialize(
+			device,
+			srvDescriptorHeap,
+			kBackgroundSrvIndex,
+			PrimitiveMesh::CreateQuad(),
+			1);
+
+		// カメラ(Z=-10)から30m奥に置き、画面全体を覆う大きさにする (板は2m×2m)
+		background.GetTransform().translate = {0.0f, 0.0f, 20.0f};
+		background.GetTransform().scale = {12.5f, 7.0f, 1.0f};
+
+		// 紫っぽい色をかけて宇宙のような色合いにする
+		background.GetColor() = {0.4f, 0.25f, 0.7f, 1.0f};
+
+		// 不透明で描画し、ノイズのα値で抜けないように閾値を0未満にする
+		background.GetBlendMode() = BlendMode::kNone;
+		background.GetDissolveThreshold() = -1.0f;
+
+		// 表示の切り替え
+		bool isBackgroundVisible = true;
+
+		// 貼るテクスチャの番号 (最初noise)
+		int backgroundTextureMode = 6;
+
+		///// ----- ===== ----- /////
+
+		///// ----- Mouse Particle Effect ----- /////
+
+		/// --- 初期化 ---
+		// Instancing用SRVは、背景の次の番号から使う
+		constexpr uint32_t kMouseParticleEffectSrvStartIndex = kBackgroundSrvIndex + 1;
+
+		// クリックで飛び散る立方体・カーソルから出る円・カーソルの輪
+		MouseParticleEffect mouseParticleEffect;
+		mouseParticleEffect.Initialize(
+			device,
+			srvDescriptorHeap,
+			kMouseParticleEffectSrvStartIndex,
+			textureManager);
+
+		// 表示の切り替え
+		bool isMouseParticleEffectVisible = true;
+
+		///// ----- ===== ----- /////
+
+		///// ----- 画面シェイク ----- /////
+
+		// クリックしたときに、View行列をずらして画面を揺らす
+		CameraShake cameraShake;
+		cameraShake.Initialize();
+
+		///// ----- ===== ----- /////
+
+		///// ----- 調整値の保存・読み込み ----- /////
+
+		// パーティクルの数やランダムの範囲を保存するcsv
+		const std::string kParticleTuningFilePath = "resources/tuning/particleTuning.csv";
+
+		// 保存・読み込みする値を登録する
+		TuningFile particleTuning;
+		particleEffect.RegisterTuning(particleTuning);
+		mouseParticleEffect.RegisterTuning(particleTuning);
+		cameraShake.RegisterTuning(particleTuning);
+
+		// 保存してあれば、その値で始める
+		particleTuning.Load(kParticleTuningFilePath);
+
+		// csvが書き換えられたら自動で読み込み直すか
+		bool isParticleTuningHotReload = true;
+
+		///// ----- ===== ----- /////
+
 		///// ----- ImGuiの初期化 ----- /////
 #ifdef USE_IMGUI
 		// Texture用SRVは1番から始まるため、その直後をScene用にする
@@ -1282,6 +1465,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		// ゲーム画面の描画先をGraphicsDeviceに教える
 		graphicsDevice->SetSceneRenderTexture(&sceneRenderTexture);
+
+		// エディターを表示するかどうか (Enterキーで切り替える)
+		// 非表示のときは、Release実行時と同じくゲーム画面だけをウィンドウ全体に描画する
+		bool isEditorVisible = true;
 
 		// ImGuiの初期化はGraphicsDeviceで済んでいるので、入力の情報だけ受け取る
 		ImGuiIO& io = ImGui::GetIO();
@@ -1359,6 +1546,44 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			fenceTextureMode,
 			isFenceVisible);
 
+		// InstancingParticleをHierarchyとPropertiesへ接続する
+		InstancingParticleEditorObject instancingParticleEditor(
+			instancingParticle,
+			"Instancing Particle",
+			instancingParticleTextureMode,
+			isInstancingParticleVisible);
+
+		// ParticleEffectをHierarchyとPropertiesへ接続する
+		ParticleEffectEditorObject particleEffectEditor(
+			particleEffect,
+			"Particle Effect",
+			isParticleEffectVisible);
+
+		// 背景をHierarchyとPropertiesへ接続する
+		InstancingParticleEditorObject backgroundEditor(
+			background,
+			"Background",
+			backgroundTextureMode,
+			isBackgroundVisible);
+
+		// MouseParticleEffectをHierarchyとPropertiesへ接続する
+		MouseParticleEffectEditorObject mouseParticleEffectEditor(
+			mouseParticleEffect,
+			"Mouse Particle Effect",
+			isMouseParticleEffectVisible);
+
+		// 画面シェイクをHierarchyとPropertiesへ接続する
+		CameraShakeEditorObject cameraShakeEditor(
+			cameraShake,
+			"Camera Shake");
+
+		// 調整値の保存・読み込みをHierarchyとPropertiesへ接続する
+		TuningFileEditorObject particleTuningEditor(
+			particleTuning,
+			"Particle Tuning",
+			kParticleTuningFilePath,
+			isParticleTuningHotReload);
+
 		/// --- hierarchyの項目 ---
 
 		std::vector<IEditorObject*> editorObjects = {
@@ -1378,6 +1603,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&teapotModelEditor,
 			&suzanneModelEditor,
 			&fenceModelEditor,
+			&instancingParticleEditor,
+			&particleEffectEditor,
+			&backgroundEditor,
+			&mouseParticleEffectEditor,
+			&cameraShakeEditor,
+			&particleTuningEditor,
 
 			// 2D
 			&sprite2DEditor};
@@ -1397,6 +1628,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 前のフレームからの経過時間 (秒)
 			const float deltaTime = graphicsDevice->GetFrameRateController()->GetDeltaTime();
 
+			/// --- マウス ---
+
+			// ゲーム画面の中でのマウスの位置 (左上が(0,0)、右下が(1,1))
+			Vector2 mouseScreenRatio = {0.0f, 0.0f};
+			// マウスがゲーム画面の上にあるか
+			bool isMouseOnScreen = false;
+			// このフレームでゲーム画面が左クリックされたか
+			bool isMouseClicked = false;
+
 			// WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
 			RECT clientRect{};
 			GetClientRect(window->GetHwnd(), &clientRect);
@@ -1408,11 +1648,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 #ifdef USE_IMGUI
 
-			// エディター有効時は、WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
-			// (エディター無効時はBackBufferを1280x720のままにして、ウィンドウに合わせて引き伸ばして表示する)
-			if (graphicsDevice->Resize(clientWidth, clientHeight)) {
-				// 作り直したときは、カメラの縦横比も新しい大きさに合わせる
-				camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
+			if (isEditorVisible) {
+				// エディター有効時は、WindowsがBackBuffer全体を拡大縮小しないよう、クライアントサイズに合わせて再作成する
+				if (graphicsDevice->Resize(clientWidth, clientHeight)) {
+					// 作り直したときは、カメラの縦横比も新しい大きさに合わせる
+					camera.SetAspectRatio(static_cast<float>(clientWidth) / static_cast<float>(clientHeight));
+				}
+			} else {
+				// エディター無効時は、Release実行時と同じくBackBufferを1280x720に戻し、ウィンドウに合わせて引き伸ばして表示する
+				if (graphicsDevice->Resize(Window::kClientWidth, Window::kClientHeight)) {
+					// 作り直したときは、カメラの縦横比も1280x720に合わせる
+					camera.SetAspectRatio(static_cast<float>(Window::kClientWidth) / static_cast<float>(Window::kClientHeight));
+				}
 			}
 
 #endif // USE_IMGUI
@@ -1570,10 +1817,22 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			DrawHierarchy(editorObjects, selectedObject);
 
+			// Sceneウィンドウのゲーム画面の上でのマウスの位置を受け取る
+			bool isSceneImageHovered = false;
+			Vector2 sceneMouseRatio = {0.0f, 0.0f};
 			const bool isSceneHovered =
 				DrawScene(
 					sceneRenderTexture.GetSRVHandle(),
-					selectedObject);
+					selectedObject,
+					isSceneImageHovered,
+					sceneMouseRatio);
+
+			// エディター表示中は、Sceneウィンドウの画像をゲーム画面として扱う
+			if (isEditorVisible) {
+				mouseScreenRatio = sceneMouseRatio;
+				isMouseOnScreen = isSceneImageHovered;
+				isMouseClicked = isSceneImageHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+			}
 
 			if (isSceneHovered) {
 				ImGuiIO& io = ImGui::GetIO();
@@ -1639,7 +1898,10 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				isTeapotVisible,
 				isSuzanneVisible,
 				isFenceVisible,
-				isSpriteVisible);
+				isInstancingParticleVisible,
+				isParticleEffectVisible,
+				isSpriteVisible
+			);
 			DrawFlowGraph(particleSystem, primitive3D);
 
 #endif // USE_IMGUI
@@ -1657,6 +1919,54 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 上段の1キーを押した瞬間だけ「1」を表示する
 			if (input->IsTrigger(DIK_1)) {
 				OutputDebugStringA("1\n");
+			}
+
+#ifdef USE_IMGUI
+
+			// Enterキーを押した瞬間にエディターの表示を切り替える (ImGuiで文字を入力しているときは除く)
+			if (input->IsTrigger(DIK_RETURN) && !ImGui::GetIO().WantTextInput) {
+				isEditorVisible = !isEditorVisible;
+
+				// エディター表示中だけ、ゲーム画面をScene用テクスチャへ描画する (nullptrならBackBufferへ直接描画する)
+				graphicsDevice->SetSceneRenderTexture(isEditorVisible ? &sceneRenderTexture : nullptr);
+
+				// エディター非表示中は、見えないImGuiがマウスやキーボードの入力を受け取らないようにする
+				ImGuiIO& editorIO = ImGui::GetIO();
+				if (isEditorVisible) {
+					editorIO.ConfigFlags &= ~(ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard);
+				} else {
+					editorIO.ConfigFlags |= ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard;
+				}
+			}
+
+#endif // USE_IMGUI
+
+			/// --- マウス (ゲーム画面) ---
+
+#ifdef USE_IMGUI
+			// エディター表示中は、上でSceneウィンドウから調べているので行わない
+			const bool isGameWindowMouse = !isEditorVisible;
+#else
+			// Releaseでは、常にウィンドウ全体がゲーム画面
+			const bool isGameWindowMouse = true;
+#endif // USE_IMGUI
+
+			if (isGameWindowMouse) {
+				// ウィンドウの中でのマウスの位置 (ピクセル) を、ウィンドウの大きさで割って0.0～1.0にする
+				// (BackBufferはウィンドウに合わせて引き伸ばされるので、割合で考えれば大きさが変わっても合う)
+				const Vector2& mousePosition = input->GetMousePosition();
+				mouseScreenRatio = {
+					mousePosition.x / static_cast<float>(clientWidth),
+					mousePosition.y / static_cast<float>(clientHeight)
+				};
+
+				// 0.0～1.0の中にあれば、ゲーム画面の上にある
+				isMouseOnScreen =
+					mouseScreenRatio.x >= 0.0f && mouseScreenRatio.x <= 1.0f &&
+					mouseScreenRatio.y >= 0.0f && mouseScreenRatio.y <= 1.0f;
+
+				// 左ボタンを押した瞬間
+				isMouseClicked = isMouseOnScreen && input->IsMouseTrigger(0);
 			}
 
 			// Spaceキーを押した瞬間に使用するカメラを切り替える
@@ -1694,6 +2004,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			///// ----- ゲームの処理 ----- /////
 
+			/// --- 調整値のホットリロード ---
+
+			// csvが書き換えられていたら読み込み直す
+			if (isParticleTuningHotReload) {
+				particleTuning.ReloadIfChanged(kParticleTuningFilePath);
+			}
+
 			/// --- カメラ ---
 
 			camera.Update();
@@ -1701,6 +2018,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- デバッグカメラ ---
 
 			debugCamera.Update();
+
+			/// --- 画面シェイク ---
+
+			// ゲーム画面をクリックした瞬間に揺らし始める
+			if (isMouseClicked) {
+				cameraShake.Start();
+			}
+
+			// 揺れている間は、毎フレームずらす量をランダムに決め直す
+			cameraShake.Update(deltaTime);
 
 			/// --- ParticleSystemの更新 ---
 
@@ -1725,10 +2052,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- ビュー行列の更新 ---
 
 			// 選択中のカメラからView行列を取得する
-			const Matrix4x4& viewMatrix =
+			const Matrix4x4& cameraViewMatrix =
 				isDebugCameraActive
 				? debugCamera.GetViewMatrix()
 				: camera.GetViewMatrix();
+
+			// 画面シェイクの揺れを加える (揺れていないときはそのまま)
+			// 全ての3D描画がこのView行列を使うので、画面全体が揺れる
+			const Matrix4x4 viewMatrix = cameraShake.ApplyToView(cameraViewMatrix);
 
 			/// --- プロジェクション行列の更新 ---
 
@@ -1786,6 +2117,30 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				viewMatrix,
 				projectionMatrix);
 
+			// 速度で粒を動かし、Instancing ParticleのWVPを更新する
+			instancingParticle.Update(viewMatrix, projectionMatrix, deltaTime);
+
+			// ぽわぽわ・星・三角錐・立方体を発生・移動・回転させ、WVPを更新する
+			particleEffect.Update(viewMatrix, projectionMatrix, deltaTime);
+
+			// 背景は動かさないので、WVPだけ更新する
+			background.TransferToGPU(viewMatrix, projectionMatrix);
+
+			// マウスの位置を、Z=0の平面上のワールド座標に直す
+			const Vector3 mouseWorldPosition = MouseParticleEffect::ScreenToWorld(
+				mouseScreenRatio,
+				viewMatrix,
+				projectionMatrix);
+
+			// クリックで立方体を飛ばし、カーソルから円を出し、カーソルの輪を動かす
+			mouseParticleEffect.Update(
+				viewMatrix,
+				projectionMatrix,
+				deltaTime,
+				mouseWorldPosition,
+				isMouseOnScreen,
+				isMouseClicked);
+
 			/// --- Object3D用WVPを計算する ---
 
 			/*
@@ -1833,6 +2188,20 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// DirectX描画開始
 			graphicsDevice->PreDraw();
+
+			/// --- 背景描画 ---
+
+			// 一番最初に描画し、Depthを書き込まないので全ての物の後ろに見える
+			if (isBackgroundVisible) {
+				// Particle用のRootSignatureとPSO (Depthを書き込まない) を使う
+				commandList->SetGraphicsRootSignature(particlePipelineState.GetRootSignature());
+				commandList->SetPipelineState(particlePipelineState.GetPipelineState(background.GetBlendMode()));
+
+				// Propertiesで選択したテクスチャを貼って描画する
+				background.Draw(
+					commandList,
+					textureManager.GetSrvHandle(static_cast<uint32_t>(backgroundTextureMode)));
+			}
 
 			// RootSignatureの設定
 			commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
@@ -1999,6 +2368,47 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					fenceTextureHandle);
 			}
 
+			/// --- パーティクル描画 ---
+
+			// 3Dオブジェクトを全て描画した後に、パーティクルを描画する
+			if (isInstancingParticleVisible || isParticleEffectVisible || isMouseParticleEffectVisible) {
+				// Particle用のRootSignatureに切り替える
+				commandList->SetGraphicsRootSignature(particlePipelineState.GetRootSignature());
+
+				/// --- Instancing Particle描画 ---
+
+				if (isInstancingParticleVisible) {
+					// BlendModeはPropertiesで選択 (初期値は加算)
+					commandList->SetPipelineState(particlePipelineState.GetPipelineState(instancingParticle.GetBlendMode()));
+
+					// ImGuiで選択したテクスチャを貼って描画する
+					instancingParticle.Draw(
+						commandList,
+						textureManager.GetSrvHandle(static_cast<uint32_t>(instancingParticleTextureMode)));
+				}
+
+				/// --- Particle Effect描画 ---
+
+				if (isParticleEffectVisible) {
+					// グループごとにBlendModeとテクスチャを切り替えて描画する
+					// 三角錐・立方体はDepthを書き込むPSOで描画する
+					particleEffect.Draw(commandList, textureManager, particlePipelineState, solidParticlePipelineState);
+				}
+
+				/// --- Mouse Particle Effect描画 ---
+
+				if (isMouseParticleEffectVisible) {
+					// 立方体・円・カーソルの輪の順に描画する (輪は一番手前に見えるように最後)
+					mouseParticleEffect.Draw(commandList, textureManager, particlePipelineState);
+				}
+
+				// 後に描くSpriteのために、Object3d用のRootSignatureとPSOへ戻す
+				commandList->SetGraphicsRootSignature(pipelineState.GetRootSignature());
+				commandList->SetPipelineState(pipelineState.GetPipelineState(BlendMode::kNone));
+				// RootSignatureを切り替えると設定が消えるため、平行光源を設定し直す
+				directionalLight.Bind(commandList, 3);
+			}
+
 			/// --- Texture ---
 
 			// 三角形とは別に選択されたTextureを取得する
@@ -2041,6 +2451,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		suzanneModel.Finalize();// suzanneモデルのリソースを解放
 		sprite2D.Finalize();
 		particleSystem.Finalize();
+		mouseParticleEffect.Finalize();
 		// ComPtrへ変更したResourceはデストラクタが自動解放する
 		// 平行光源のリソースを解放する
 
@@ -2050,6 +2461,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		/// --- 2_PSOとコマンド関連は各クラスが解放する ---
 
 		pipelineState.Finalize();
+		particlePipelineState.Finalize();
+		solidParticlePipelineState.Finalize();
 
 		/// --- 5_スワップチェーンとバックバッファリソース ---
 

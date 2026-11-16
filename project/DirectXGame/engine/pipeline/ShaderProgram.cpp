@@ -10,17 +10,21 @@ ShaderProgram::~ShaderProgram() {
 }
 
 /// --- 初期化 ---
-// 借りたDXCでVertexShaderとPixelShaderをコンパイル
-void ShaderProgram::Initialize(DxcCompiler* dxcCompiler, std::ostream& logStream) {
+// 借りたDXCで、指定されたVertexShaderとPixelShaderをコンパイル
+void ShaderProgram::Initialize(
+	DxcCompiler* dxcCompiler,
+	std::ostream& logStream,
+	const std::wstring& vertexShaderPath,
+	const std::wstring& pixelShaderPath) {
 
 	// NULL検出
 	assert(dxcCompiler);
 
-	// ShaderをCompileする
-	vertexShaderBlob_ = dxcCompiler->CompileShader(L"resources/shaders/Object3D.VS.hlsl", L"vs_6_0", logStream);
+	// 指定されたShaderをCompileする
+	vertexShaderBlob_ = dxcCompiler->CompileShader(vertexShaderPath, L"vs_6_0", logStream);
 	assert(vertexShaderBlob_ != nullptr);
 
-	pixelShaderBlob_ = dxcCompiler->CompileShader(L"resources/shaders/Object3D.PS.hlsl", L"ps_6_0", logStream);
+	pixelShaderBlob_ = dxcCompiler->CompileShader(pixelShaderPath, L"ps_6_0", logStream);
 	assert(pixelShaderBlob_ != nullptr);
 }
 

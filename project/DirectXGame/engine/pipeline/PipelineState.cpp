@@ -15,12 +15,23 @@ PipelineState::~PipelineState() {
 /// <param name="device"></param>
 /// <param name="dxcCompiler"></param>
 /// <param name="logStream"></param>
-void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, std::ostream& logStream) {
+/// <param name="vertexShaderPath"></param>
+/// <param name="pixelShaderPath"></param>
+/// <param name="isInstancing"></param>
+/// <param name="isDepthWriteEnabled"></param>
+void PipelineState::Initialize(
+	ID3D12Device* device,
+	DxcCompiler* dxcCompiler,
+	std::ostream& logStream,
+	const std::wstring& vertexShaderPath,
+	const std::wstring& pixelShaderPath,
+	bool isInstancing,
+	bool isDepthWriteEnabled) {
 
 	/// --- RootSignature ---
 
-	// RootSignatureを作成
-	rootSignature_.Initialize(device, logStream);
+	// RootSignatureを作成 (Particle用はVertexShaderでStructuredBufferを受け取る)
+	rootSignature_.Initialize(device, logStream, isInstancing);
 
 	/// --- InputLayout ---
 
@@ -34,13 +45,13 @@ void PipelineState::Initialize(ID3D12Device* device, DxcCompiler* dxcCompiler, s
 
 	/// --- ShaderProgram ---
 
-	// 借りたDXCでVertexShaderとPixelShaderをコンパイル
-	shaderProgram_.Initialize(dxcCompiler, logStream);
+	// 借りたDXCで、指定されたVertexShaderとPixelShaderをコンパイル
+	shaderProgram_.Initialize(dxcCompiler, logStream, vertexShaderPath, pixelShaderPath);
 
 	/// --- DepthStencilState ---
 
-	// 奥行きの比較と書き込み方法を設定
-	depthStencilState_.Initialize();
+	// 奥行きの比較と書き込み方法を設定 (半透明で重なるParticle用は、Depthを書き込まない)
+	depthStencilState_.Initialize(isDepthWriteEnabled);
 
 	/// --- GraphicsPipelineState ---
 

@@ -43,6 +43,24 @@ void DirectInput::Initialize(Window* window) {
 	// 排他制御レベルのセット
 	hr = keyboard_->SetCooperativeLevel(window_->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
 	assert(SUCCEEDED(hr));
+
+	/// --- マウス ---
+
+	// マウスデバイスの生成
+	hr = directInput_->CreateDevice(
+		GUID_SysMouse,
+		mouse_.GetAddressOf(),
+		nullptr
+	);
+	assert(SUCCEEDED(hr));
+
+	// 入力データ形式のセット (ボタン8個まで取得できる形式)
+	hr = mouse_->SetDataFormat(&c_dfDIMouse2);
+	assert(SUCCEEDED(hr));
+
+	// 排他制御レベルのセット (他のアプリでもマウスを使えるように非排他にする)
+	hr = mouse_->SetCooperativeLevel(window_->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+	assert(SUCCEEDED(hr));
 }
 
 /// <summary>
@@ -71,6 +89,27 @@ void DirectInput::Update() {
 		std::memset(keys_, 0, sizeof(keys_));
 	}
 
+	/// --- マウス ---
+
+	// 現在の入力状態を1フレーム前の状態として保存する
+	previousMouseState_ = mouseState_;
+
+	// マウス情報の取得開始し、ボタンの状態を取得する
+	// ウィンドウが非アクティブだった場合などは押されていない状態にする
+	hr = mouse_->Acquire();
+	if (SUCCEEDED(hr)) {
+		hr = mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
+	}
+	if (FAILED(hr)) {
+		mouseState_ = {};
+	}
+
+	// カーソルの位置はDirectInputでは取れないので、WindowsAPIで画面座標を取ってクライアント座標に直す
+	POINT cursorPoint{};
+	GetCursorPos(&cursorPoint);
+	ScreenToClient(window_->GetHwnd(), &cursorPoint);
+	mousePosition_ = {static_cast<float>(cursorPoint.x), static_cast<float>(cursorPoint.y)};
+
 	// キーが押されているときの処理例
 	/*
 	// 数字の0キーが押されていたら
@@ -95,6 +134,11 @@ void DirectInput::Finalize() {
 		keyboard_.Reset();
 	}
 
+	if (mouse_) {
+		mouse_->Unacquire();
+		mouse_.Reset();
+	}
+
 	directInput_.Reset();
 }
 
@@ -107,6 +151,29 @@ bool DirectInput::IsTrigger(uint8_t keyNumber) const {
 	// 現在は押されていて、前フレームでは押されていなければトリガー
 	const bool isCurrentPress = (keys_[keyNumber] & 0x80) != 0;
 	const bool wasPreviousPress = (previousKeys_[keyNumber] & 0x80) != 0;
+
+	return isCurrentPress && !wasPreviousPress;
+}
+
+bool DirectInput::IsMousePress(uint32_t buttonNumber) const {
+	// ボタンは8個まで
+	if (buttonNumber >= 8) {
+		return false;
+	}
+
+	// 最上位ビットが立っていれば、現在ボタンが押されている
+	return (mouseState_.rgbButtons[buttonNumber] & 0x80) != 0;
+}
+
+bool DirectInput::IsMouseTrigger(uint32_t buttonNumber) const {
+	// ボタンは8個まで
+	if (buttonNumber >= 8) {
+		return false;
+	}
+
+	// 現在は押されていて、前フレームでは押されていなければトリガー
+	const bool isCurrentPress = (mouseState_.rgbButtons[buttonNumber] & 0x80) != 0;
+	const bool wasPreviousPress = (previousMouseState_.rgbButtons[buttonNumber] & 0x80) != 0;
 
 	return isCurrentPress && !wasPreviousPress;
 }
