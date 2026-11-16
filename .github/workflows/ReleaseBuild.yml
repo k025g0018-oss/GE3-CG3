@@ -1,0 +1,37 @@
+name: ReleaseBuild
+
+# masterにプッシュされたら実行する
+on:
+  push:
+    branches:
+      - master
+
+env:
+  # リポジトリのルートディレクトリを起点としたソリューションファイルのパス
+  SOLUTION_FILE_PATH: project/DirectXGame.slnx
+  # Visual Studioの構成 (Debug / Development / Release)
+  CONFIGURATION: Release
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+
+    steps:
+    # リポジトリを取得する (DirectXTexのサブモジュールも一緒に取る)
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+
+    # msbuildを使えるようにする
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v3
+      with:
+        msbuild-architecture: x64
+
+    # ソリューションをビルドする
+    - name: Build
+      run: msbuild ${{env.SOLUTION_FILE_PATH}} /p:Platform=x64,Configuration=${{env.CONFIGURATION}}
