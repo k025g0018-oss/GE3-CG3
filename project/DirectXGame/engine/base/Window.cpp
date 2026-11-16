@@ -102,8 +102,8 @@ void Window::Initialize() {
 
 	// ウィンドウプロシージャ
 	wc_.lpfnWndProc = WindowProc;
-	// ウィンドウクラス名(何でもよい)
-	wc_.lpszClassName = L"CG2WindowClass";
+	// ウィンドウクラス名
+	wc_.lpszClassName = L"GE3/CG3";
 	// インスタンスハンドル
 	wc_.hInstance = GetModuleHandle(nullptr);
 	// カーソル
@@ -120,7 +120,7 @@ void Window::Initialize() {
 	// ウィンドウの生成
 	hwnd_ = CreateWindow(
 		wc_.lpszClassName,	  // 利用するクラス名
-		L"CG2",				  // タイトルバーの文字
+		L"LE2B_13_タヤ_ナオユキ",				  // タイトルバーの文字
 		WS_OVERLAPPEDWINDOW,  // ウィンドウスタイル
 		CW_USEDEFAULT,		  // 表示X座標(Windowsに任せる)
 		CW_USEDEFAULT,		  // 表示Y座標(windowsOSに任せる)
