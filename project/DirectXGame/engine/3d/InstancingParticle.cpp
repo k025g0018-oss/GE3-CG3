@@ -145,6 +145,8 @@ void InstancingParticle::SimulateParticles(float deltaTime) {
 			// 速度(m/s) × 経過時間(s) で位置を進める
 			particles_[index].transform.translate =
 				particles_[index].transform.translate + particles_[index].velocity * deltaTime;
+			// 角速度(rad/s) × 経過時間(s) で回転させる
+			particles_[index].transform.rotate.z += particles_[index].angularVelocity.z * deltaTime;
 			// 経過時間を足す
 			particles_[index].currentTime += deltaTime;
 		}
@@ -393,6 +395,11 @@ Particle InstancingParticle::MakeNewParticle(std::mt19937& randomEngine) {
 		distColor(randomEngine),
 		1.0f
 	};
+
+	// 最初の向きと、z軸回転の速さ (rad/s) をランダムに決める
+	std::uniform_real_distribution<float> distRotate(-std::numbers::pi_v<float>, std::numbers::pi_v<float>);
+	particle.transform.rotate.z = distRotate(randomEngine);
+	particle.angularVelocity = {0.0f, 0.0f, distRotate(randomEngine)};
 
 	// 1秒～3秒の間でランダムに生存させる
 	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
