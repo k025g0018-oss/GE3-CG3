@@ -218,6 +218,14 @@ public:
 	}
 
 	/// <summary>
+	/// Propertiesから常にカメラの方を向くか (ビルボード) を操作する
+	/// </summary>
+	/// <returns></returns>
+	bool& GetIsBillboard() {
+		return isBillboard_;
+	}
+
+	/// <summary>
 	/// 粒のデータを取得する (外側で動かし方を決めるときに使う)
 	/// </summary>
 	/// <returns></returns>
@@ -312,6 +320,9 @@ private:
 
 	// Randomのとき、寿命に合わせて閾値を上げていくかどうか
 	bool isDissolveOverLife_ = false;
+
+	// 常にカメラの方を向くか (ビルボード)
+	bool isBillboard_ = false;
 
 	// 寿命のうち、フェードインに使う割合 (0.0ならフェードインしない)
 	float fadeInRatio_ = 0.0f;

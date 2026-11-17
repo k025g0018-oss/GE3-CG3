@@ -418,6 +418,7 @@ void DrawStatistics(
 	bool& isSuzanneVisible,
 	bool& isFenceVisible,
 	bool& isInstancingParticleVisible,
+	bool& isCircleParticleVisible,
 	bool& isParticleEffectVisible,
 	bool& isSpriteVisible
 ) {
@@ -474,6 +475,7 @@ void DrawStatistics(
 		isSuzanneVisible = true;
 		isFenceVisible = true;
 		isInstancingParticleVisible = true;
+		isCircleParticleVisible = true;
 		isParticleEffectVisible = true;
 		isSpriteVisible = true;
 	}
@@ -495,6 +497,7 @@ void DrawStatistics(
 		isSuzanneVisible = false;
 		isFenceVisible = false;
 		isInstancingParticleVisible = false;
+		isCircleParticleVisible = false;
 		isParticleEffectVisible = false;
 		isSpriteVisible = false;
 	}
@@ -1420,6 +1423,36 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		///// ----- ===== ----- /////
 
+		///// ----- Circle Particle ----- /////
+
+		/// --- 初期化 ---
+		// 円パーティクルの最大数
+		constexpr uint32_t kCircleParticleMaxCount = 10;
+
+		// Instancing用SRVは、Mouse Particle Effectの次の番号から使う
+		constexpr uint32_t kCircleParticleSrvIndex = kMouseParticleEffectSrvStartIndex + MouseParticleEffect::kSrvCount;
+
+		// circle.pngを貼った板をDrawInstancedでまとめて描画する
+		InstancingParticle circleParticle;
+		circleParticle.Initialize(
+			device,
+			srvDescriptorHeap,
+			kCircleParticleSrvIndex,
+			PrimitiveMesh::CreateQuad(),
+			kCircleParticleMaxCount);
+
+		// ランダムな位置・速度・色で出し、消えたら出し直す
+		circleParticle.SetUpdateMode(ParticleUpdateMode::kRandom);
+		circleParticle.GetIsRespawn() = true;
+
+		// 表示の切り替え
+		bool isCircleParticleVisible = true;
+
+		// 貼るテクスチャの番号 (最初circle)
+		int circleParticleTextureMode = 9;
+
+		///// ----- ===== ----- /////
+
 		///// ----- 画面シェイク ----- /////
 
 		// クリックしたときに、View行列をずらして画面を揺らす
@@ -1559,6 +1592,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			"Particle Effect",
 			isParticleEffectVisible);
 
+		// Circle ParticleをHierarchyとPropertiesへ接続する
+		InstancingParticleEditorObject circleParticleEditor(
+			circleParticle,
+			"Circle Particle",
+			circleParticleTextureMode,
+			isCircleParticleVisible);
+
 		// 背景をHierarchyとPropertiesへ接続する
 		InstancingParticleEditorObject backgroundEditor(
 			background,
@@ -1605,6 +1645,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			&fenceModelEditor,
 			&instancingParticleEditor,
 			&particleEffectEditor,
+			&circleParticleEditor,
 			&backgroundEditor,
 			&mouseParticleEffectEditor,
 			&cameraShakeEditor,
@@ -1899,6 +1940,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				isSuzanneVisible,
 				isFenceVisible,
 				isInstancingParticleVisible,
+				isCircleParticleVisible,
 				isParticleEffectVisible,
 				isSpriteVisible
 			);
@@ -2119,6 +2161,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// 速度で粒を動かし、Instancing ParticleのWVPを更新する
 			instancingParticle.Update(viewMatrix, projectionMatrix, deltaTime);
+
+			// 円の板を動かし、WVPを更新する
+			circleParticle.Update(viewMatrix, projectionMatrix, deltaTime);
 
 			// ぽわぽわ・星・三角錐・立方体を発生・移動・回転させ、WVPを更新する
 			particleEffect.Update(viewMatrix, projectionMatrix, deltaTime);
@@ -2371,7 +2416,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			/// --- パーティクル描画 ---
 
 			// 3Dオブジェクトを全て描画した後に、パーティクルを描画する
-			if (isInstancingParticleVisible || isParticleEffectVisible || isMouseParticleEffectVisible) {
+			if (isInstancingParticleVisible || isCircleParticleVisible || isParticleEffectVisible || isMouseParticleEffectVisible) {
 				// Particle用のRootSignatureに切り替える
 				commandList->SetGraphicsRootSignature(particlePipelineState.GetRootSignature());
 
@@ -2385,6 +2430,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 					instancingParticle.Draw(
 						commandList,
 						textureManager.GetSrvHandle(static_cast<uint32_t>(instancingParticleTextureMode)));
+				}
+
+				/// --- Circle Particle描画 ---
+
+				if (isCircleParticleVisible) {
+					// BlendModeはPropertiesで選択 (初期値は加算)
+					commandList->SetPipelineState(particlePipelineState.GetPipelineState(circleParticle.GetBlendMode()));
+
+					// ImGuiで選択したテクスチャを貼って描画する
+					circleParticle.Draw(
+						commandList,
+						textureManager.GetSrvHandle(static_cast<uint32_t>(circleParticleTextureMode)));
 				}
 
 				/// --- Particle Effect描画 ---

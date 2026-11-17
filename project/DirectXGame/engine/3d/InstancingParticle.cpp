@@ -173,6 +173,20 @@ void InstancingParticle::TransferToGPU(const Matrix4x4& viewMatrix, const Matrix
 	// View, Projectionは全粒共通なので先にかけておく
 	const Matrix4x4 viewProjectionMatrix = Matrix4x4::Multiply(viewMatrix, projectionMatrix);
 
+	/// --- ビルボード ---
+
+	// 板の表をカメラへ向けるため、Y軸でπ回転させる
+	const Matrix4x4 backToFrontMatrix = Matrix4x4::MakeRotateYMatrix(std::numbers::pi_v<float>);
+
+	// View行列の逆行列がカメラのWorld行列
+	const Matrix4x4 cameraMatrix = Matrix4x4::Inverse(viewMatrix);
+
+	// カメラと同じ回転を板にもかけて、常にカメラの方を向かせる
+	Matrix4x4 billboardMatrix = Matrix4x4::Multiply(backToFrontMatrix, cameraMatrix);
+	billboardMatrix.m[3][0] = 0.0f; // 平行移動成分はいらない
+	billboardMatrix.m[3][1] = 0.0f;
+	billboardMatrix.m[3][2] = 0.0f;
+
 	/// --- 描画数の決定 ---
 
 	// 描画すべきインスタンス数を数え直す
@@ -184,15 +198,41 @@ void InstancingParticle::TransferToGPU(const Matrix4x4& viewMatrix, const Matrix
 			continue;
 		}
 
-		// 粒自身のTransformから行列を作る
-		const Matrix4x4 localMatrix = Matrix4x4::MakeAffineMatrix(
-			particles_[index].transform.scale,
-			particles_[index].transform.rotate,
-			particles_[index].transform.translate
-		);
+		Matrix4x4 worldMatrix;
 
-		// 粒 -> 親 の順にかけてWorld行列を作る
-		const Matrix4x4 worldMatrix = Matrix4x4::Multiply(localMatrix, parentWorldMatrix);
+		if (isBillboard_) {
+			/// --- ビルボードする ---
+
+			// 粒の位置を親で動かして、ワールドでの位置にする
+			const Vector3 worldPosition = Vector3::Transform(particles_[index].transform.translate, parentWorldMatrix);
+
+			// 大きさは粒と親をかけ合わせる
+			const Vector3 worldScale = {
+				particles_[index].transform.scale.x * transform_.scale.x,
+				particles_[index].transform.scale.y * transform_.scale.y,
+				particles_[index].transform.scale.z * transform_.scale.z
+			};
+
+			// 板の中での回転 (Z軸) は残す
+			const Matrix4x4 rotateZMatrix = Matrix4x4::MakeRotateZMatrix(particles_[index].transform.rotate.z);
+
+			// scale → Z回転 → billboard → translate の順にかける
+			worldMatrix = Matrix4x4::Multiply(Matrix4x4::MakeScaleMatrix(worldScale), rotateZMatrix);
+			worldMatrix = Matrix4x4::Multiply(worldMatrix, billboardMatrix);
+			worldMatrix = Matrix4x4::Multiply(worldMatrix, Matrix4x4::MakeTranslateMatrix(worldPosition));
+		} else {
+			/// --- ビルボードしない ---
+
+			// 粒自身のTransformから行列を作る
+			const Matrix4x4 localMatrix = Matrix4x4::MakeAffineMatrix(
+				particles_[index].transform.scale,
+				particles_[index].transform.rotate,
+				particles_[index].transform.translate
+			);
+
+			// 粒 -> 親 の順にかけてWorld行列を作る
+			worldMatrix = Matrix4x4::Multiply(localMatrix, parentWorldMatrix);
+		}
 
 		// 生きている粒だけを前から詰めて、StructuredBufferへ書き込む
 		instancingData_[aliveCount_].WVP = Matrix4x4::Multiply(worldMatrix, viewProjectionMatrix);

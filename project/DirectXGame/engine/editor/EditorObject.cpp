@@ -15,7 +15,8 @@ const char* kTextureModes[] = {
 	"5 : Fence",
 	"6 : Noise",
 	"7 : Powapowa",
-	"8 : Star"
+	"8 : Star",
+	"9 : Circle"
 };
 }
 
@@ -562,6 +563,11 @@ void InstancingParticleEditorObject::DrawProperties() {
 
 	/// --- 見た目 ---
 
+	ImGui::SeparatorText("Appearance");
+
+	// 常にカメラの方を向かせる
+	ImGui::Checkbox("Billboard", &particle_.GetIsBillboard());
+
 	// 描画に使うBlendModeを選ぶ
 	const char* blendModeNames[] = { "None", "Normal", "Add", "Subtract", "Multiply", "Screen" };
 	int blendModeIndex = static_cast<int>(particle_.GetBlendMode());
@@ -638,6 +644,9 @@ void ParticleEffectEditorObject::DrawProperties() {
 		if (ImGui::Button("Randomize")) {
 			group->Randomize();
 		}
+
+		// 常にカメラの方を向かせる (板のグループ用)
+		ImGui::Checkbox("Billboard", &particle.GetIsBillboard());
 
 		// 1～最大数の範囲で使う粒の数を変更する
 		const uint32_t minCount = 1;

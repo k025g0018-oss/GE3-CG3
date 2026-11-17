@@ -18,7 +18,7 @@ class GraphicsDevice;
 class TextureManager {
 public:
 	// 使用するテクスチャの数
-	static constexpr uint32_t kTextureCount = 9;
+	static constexpr uint32_t kTextureCount = 10;
 
 	TextureManager() = default;
 	~TextureManager();
