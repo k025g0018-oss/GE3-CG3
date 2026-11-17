@@ -14,13 +14,13 @@ on:
 # プロジェクトのニーズに合わせて、これらのリストを変更してください。
 # パターンはスペース区切りで指定します。
 env:
-  # 特定野ファイル名 (拡張子など) のパターン
+  # 特定のファイル名 (拡張子など) のパターン
   UNWANTED_NAME_PATTERNS: "*.pdb *.ilk *.user *.ncb dxcompiler.dll dxil.dll"
 
   # ディレクトリ名のパターン (ビルド出力フォルダなど)
   UNWANTED_DIR_PATTERNS: "generated x64 win32 arm64 .vs bin ipch logs Dump"
 
-job:
+jobs:
   check-files:
     name: 不要なファイルを検索
     runs-on: ubuntu-latest
@@ -60,4 +60,3 @@ job:
           fi
 
           echo "リポジトリはクリーンです。"
-
